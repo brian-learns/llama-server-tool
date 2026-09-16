@@ -8,7 +8,8 @@ from typer.testing import CliRunner
 
 from helpers import FakeGet, json_response
 from llama_server_tool.__main__ import app
-from llama_server_tool.props import Props, format_value
+from llama_server_tool.props import Props
+from llama_server_tool.server import format_value
 
 runner = CliRunner()
 

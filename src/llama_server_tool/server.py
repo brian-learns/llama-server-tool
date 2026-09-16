@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: 0BSD
 # Copyright (c) 2026 llama_server_tool creators and contributors
 
-"""Shared llama-server access: URL resolution and JSON endpoint fetching."""
+"""Shared llama-server access: URL resolution, endpoint fetching, value formatting."""
 
+import json
 import os
 from typing import Any
 
@@ -31,13 +32,30 @@ def resolve_server_url(server: str | None = None) -> str:
     return url.rstrip("/")
 
 
-def fetch_json(base: str, path: str, params: dict[str, str] | None = None) -> tuple[int, dict[str, Any]]:
-    """GET a JSON endpoint, returning (status code, parsed body)."""
+def format_value(value: object) -> str:
+    """Format a value for reports: rounded floats, lowercase bools, comma-joined lists."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, float):
+        return str(round(value, 4))
+    if isinstance(value, list):
+        return ", ".join(str(item) for item in value)
+    return str(value)
+
+
+def fetch(base: str, path: str, params: dict[str, str] | None = None) -> tuple[int, str]:
+    """GET an endpoint, returning (status code, response text)."""
     try:
         response = httpx.get(f"{base}{path}", timeout=REQUEST_TIMEOUT, params=params)
     except httpx.HTTPError as err:
         raise ServerError(str(err)) from err
+    return response.status_code, response.text
+
+
+def fetch_json(base: str, path: str, params: dict[str, str] | None = None) -> tuple[int, dict[str, Any]]:
+    """GET a JSON endpoint, returning (status code, parsed body)."""
+    status, text = fetch(base, path, params=params)
     try:
-        return response.status_code, response.json()
+        return status, json.loads(text)
     except ValueError as err:
         raise ServerError(f"invalid JSON from {path}: {err}") from err

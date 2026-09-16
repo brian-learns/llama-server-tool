@@ -26,3 +26,8 @@ class FakeGet:
 def json_response(body, status_code=200):
     """Build an httpx.Response with a JSON body."""
     return httpx.Response(status_code, json=body, request=httpx.Request("GET", "http://x"))
+
+
+def text_response(body, status_code=200):
+    """Build an httpx.Response with a plain-text body."""
+    return httpx.Response(status_code, text=body, request=httpx.Request("GET", "http://x"))

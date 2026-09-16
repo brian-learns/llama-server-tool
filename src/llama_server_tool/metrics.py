@@ -26,3 +26,67 @@ In *router mode* the query param `?model={model_id}` has to be set. This endpoin
 | `llamacpp:spec_decode_num_accepted_tokens_per_pos_total` | Counter | Accepted tokens per draft position (labeled `position="N"`; absent when spec-decode is off or before the first completed speculative request). |
 
 """
+
+from prometheus_client.parser import text_string_to_metric_families
+from pydantic import BaseModel
+
+from .server import ApiError, format_value
+
+
+class MetricSample(BaseModel):
+    """A single sample of a metric family, with its labels and value."""
+
+    labels: dict[str, str] = {}
+    value: float
+
+
+class MetricFamilyEntry(BaseModel):
+    """One metric family (name, type, help text, samples) from the /metrics text."""
+
+    name: str
+    type: str
+    help: str | None = None
+    samples: list[MetricSample] = []
+
+    def render(self) -> str:
+        """Format the family section for output."""
+        lines = [f"  {self.name} ({self.type})"]
+        if self.help:
+            lines.append(f"    {self.help}")
+        for sample in self.samples:
+            labels = "".join(f'[{k}="{v}"]' for k, v in sample.labels.items())
+            value = format_value(sample.value)
+            lines.append(f"      {labels}{value}" if not labels else f"      {labels} {value}")
+        return "\n".join(lines)
+
+
+class MetricsReport(BaseModel):
+    """Parsed /metrics content (or an API error body), rendered by pydantic."""
+
+    families: list[MetricFamilyEntry] = []
+    error: ApiError | None = None
+
+    def render(self) -> str:
+        """Format the metrics report; families keep the server's order."""
+        if self.error is not None:
+            return f"metrics: {self.error.message}"
+        return "\n".join(["metrics:", *(family.render() for family in self.families)])
+
+
+def parse_exposition(text: str) -> list[MetricFamilyEntry]:
+    """Parse Prometheus exposition text into MetricFamilyEntry models."""
+    entries = []
+    for family in text_string_to_metric_families(text):
+        # The parser strips the counter "_total" suffix from family names (OpenMetrics
+        # convention); sample names keep it, so prefer those to match the documented
+        # llamacpp:* metric names.
+        name = family.samples[0].name if family.samples else family.name
+        entries.append(
+            MetricFamilyEntry(
+                name=name,
+                type=family.type.lower(),
+                help=family.documentation or None,
+                samples=[MetricSample(labels=dict(sample.labels), value=sample.value) for sample in family.samples],
+            )
+        )
+    return entries

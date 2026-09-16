@@ -3,13 +3,16 @@
 
 """Command line tool to administer a local llama-server."""
 
+import json
+
 import typer
 from pydantic import ValidationError
 
 from .health import Health
+from .metrics import MetricsReport, parse_exposition
 from .models import ModelList
 from .props import Props
-from .server import ServerError, fetch_json, resolve_server_url
+from .server import ServerError, fetch, fetch_json, resolve_server_url
 
 app = typer.Typer()
 
@@ -83,6 +86,35 @@ def props(
     typer.echo(result.render())
     if result.error is not None or status != 200:
         raise typer.Exit(code=1)
+
+
+@app.command()
+def metrics(
+    server: str | None = typer.Option(None, help="Base URL of the llama-server."),
+    model: str | None = typer.Option(None, help="Model id to query (required in router mode)."),
+) -> None:
+    """Show server metrics via GET /metrics (Prometheus format)."""
+    base = resolve_server_url(server)
+    params = {"model": model} if model is not None else None
+    try:
+        status, text = fetch(base, "/metrics", params=params)
+    except ServerError as err:
+        typer.echo(f"metrics: {err}", err=True)
+        raise typer.Exit(code=1) from err
+    if status != 200:
+        try:
+            result = MetricsReport.model_validate(json.loads(text))
+        except ValueError:
+            typer.echo(f"metrics: HTTP {status}: {text.strip()}", err=True)
+            raise typer.Exit(code=1) from None
+        typer.echo(result.render())
+        raise typer.Exit(code=1)
+    try:
+        families = parse_exposition(text)
+    except ValueError as err:
+        typer.echo(f"metrics: failed to parse exposition text: {err}", err=True)
+        raise typer.Exit(code=1) from err
+    typer.echo(MetricsReport(families=families).render())
 
 
 def main() -> None:

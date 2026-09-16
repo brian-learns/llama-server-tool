@@ -101,18 +101,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from .server import ApiError
-
-
-def format_value(value: object) -> str:
-    """Format a prop value: rounded floats, lowercase bools, comma-joined lists."""
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, float):
-        return str(round(value, 4))
-    if isinstance(value, list):
-        return ", ".join(str(item) for item in value)
-    return str(value)
+from .server import ApiError, format_value
 
 
 class GenerationParams(BaseModel):
