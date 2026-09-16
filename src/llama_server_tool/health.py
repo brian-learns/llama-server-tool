@@ -12,3 +12,28 @@ This endpoint is public (no API key check). `/v1/health` also works.
   - Body: `{"status": "ok" }`
   - Explanation: the model is successfully loaded and the server is ready.
 """
+
+from pydantic import BaseModel
+
+
+class HealthError(BaseModel):
+    """Error object returned by the server when it is unhealthy."""
+
+    code: int
+    message: str
+    type: str
+
+
+class Health(BaseModel):
+    """`GET /health` response body, validated and rendered by pydantic."""
+
+    status: str | None = None
+    error: HealthError | None = None
+
+    def render(self) -> str:
+        """Format the health result for output."""
+        if self.status is not None:
+            return f"health: {self.status}"
+        if self.error is not None:
+            return f"health: {self.error.message}"
+        return "health: unknown response"
