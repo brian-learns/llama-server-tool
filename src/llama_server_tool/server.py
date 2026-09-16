@@ -31,10 +31,10 @@ def resolve_server_url(server: str | None = None) -> str:
     return url.rstrip("/")
 
 
-def fetch_json(base: str, path: str) -> tuple[int, dict[str, Any]]:
+def fetch_json(base: str, path: str, params: dict[str, str] | None = None) -> tuple[int, dict[str, Any]]:
     """GET a JSON endpoint, returning (status code, parsed body)."""
     try:
-        response = httpx.get(f"{base}{path}", timeout=REQUEST_TIMEOUT)
+        response = httpx.get(f"{base}{path}", timeout=REQUEST_TIMEOUT, params=params)
     except httpx.HTTPError as err:
         raise ServerError(str(err)) from err
     try:

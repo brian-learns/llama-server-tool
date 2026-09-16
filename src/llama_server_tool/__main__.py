@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from .health import Health
 from .models import ModelList
+from .props import Props
 from .server import ServerError, fetch_json, resolve_server_url
 
 app = typer.Typer()
@@ -52,6 +53,32 @@ def models(server: str | None = typer.Option(None, help="Base URL of the llama-s
         result = ModelList.model_validate(body)
     except ValidationError as err:
         typer.echo(f"models: invalid response body: {err}", err=True)
+        raise typer.Exit(code=1) from err
+    typer.echo(result.render())
+    if result.error is not None or status != 200:
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def props(
+    server: str | None = typer.Option(None, help="Base URL of the llama-server."),
+    model: str | None = typer.Option(None, help="Model id to query; nothing is loaded by default."),
+    autoload: bool = typer.Option(False, help="Allow the server to load/pre-warm the model."),
+) -> None:
+    """Show server properties via GET /props."""
+    base = resolve_server_url(server)
+    params = None
+    if model is not None:
+        params = {"model": model, "autoload": "true" if autoload else "false"}
+    try:
+        status, body = fetch_json(base, "/props", params=params)
+    except ServerError as err:
+        typer.echo(f"props: {err}", err=True)
+        raise typer.Exit(code=1) from err
+    try:
+        result = Props.model_validate(body)
+    except ValidationError as err:
+        typer.echo(f"props: invalid response body: {err}", err=True)
         raise typer.Exit(code=1) from err
     typer.echo(result.render())
     if result.error is not None or status != 200:

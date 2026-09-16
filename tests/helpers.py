@@ -13,9 +13,11 @@ class FakeGet:
         self.response = response
         self.error = error
         self.urls = []
+        self.params = None
 
-    def __call__(self, url, timeout=None):
+    def __call__(self, url, timeout=None, params=None):
         self.urls.append(url)
+        self.params = params
         if self.error is not None:
             raise self.error
         return self.response

@@ -96,3 +96,111 @@ By default, it is read-only. To make POST request to change global properties, y
 - `is_sleeping` - sleeping status, see [Sleeping on idle](#sleeping-on-idle)
 
 """
+
+from typing import Any
+
+from pydantic import BaseModel
+
+from .server import ApiError
+
+
+def format_value(value: object) -> str:
+    """Format a prop value: rounded floats, lowercase bools, comma-joined lists."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, float):
+        return str(round(value, 4))
+    if isinstance(value, list):
+        return ", ".join(str(item) for item in value)
+    return str(value)
+
+
+class GenerationParams(BaseModel):
+    """Curated generation params from /props; all optional, extras ignored."""
+
+    n_predict: int | None = None
+    seed: int | None = None
+    temperature: float | None = None
+    dynatemp_range: float | None = None
+    top_k: int | None = None
+    top_p: float | None = None
+    min_p: float | None = None
+    typical_p: float | None = None
+    repeat_last_n: int | None = None
+    repeat_penalty: float | None = None
+    presence_penalty: float | None = None
+    frequency_penalty: float | None = None
+    mirostat: int | None = None
+    mirostat_tau: float | None = None
+    mirostat_eta: float | None = None
+    stop: list[str] | None = None
+    max_tokens: int | None = None
+    n_keep: int | None = None
+    ignore_eos: bool | None = None
+    stream: bool | None = None
+    samplers: list[str] | None = None
+
+    def render_lines(self) -> list[tuple[str, str]]:
+        """Return (label, value) lines for the params that are present and non-empty."""
+        return [
+            (f"{key}:", format_value(value)) for key, value in self.model_dump(exclude_none=True).items() if value != []
+        ]
+
+
+class DefaultGenerationSettings(BaseModel):
+    """The default generation settings section of /props."""
+
+    id: int | None = None
+    n_ctx: int | None = None
+    speculative: bool | None = None
+    is_processing: bool | None = None
+    params: GenerationParams | None = None
+
+
+class Props(BaseModel):
+    """`GET /props` response body, validated and rendered by pydantic."""
+
+    default_generation_settings: DefaultGenerationSettings | None = None
+    total_slots: int | None = None
+    model_path: str | None = None
+    # Captured for validation only; render() never emits its content (raw Jinja).
+    chat_template: str | None = None
+    chat_template_caps: dict[str, Any] | None = None
+    modalities: dict[str, bool] | None = None
+    is_sleeping: bool | None = None
+    build_info: str | None = None
+    error: ApiError | None = None
+
+    def render(self) -> str:
+        """Format the props report; the chat template content is never included."""
+        if self.error is not None:
+            return f"props: {self.error.message}"
+        lines = ["props:"]
+        top: list[tuple[str, str]] = []
+        if self.model_path is not None:
+            top.append(("model_path:", self.model_path))
+        if self.total_slots is not None:
+            top.append(("total_slots:", str(self.total_slots)))
+        if self.is_sleeping is not None:
+            top.append(("is_sleeping:", format_value(self.is_sleeping)))
+        if self.modalities:
+            top.append(("modalities:", ", ".join(f"{k}={format_value(v)}" for k, v in self.modalities.items())))
+        if self.build_info is not None:
+            top.append(("build_info:", self.build_info))
+        if self.chat_template is not None:
+            top.append(("chat_template:", f"<hidden: {len(self.chat_template)} chars>"))
+        lines.extend(f"  {label:<21}{value}" for label, value in top)
+        if self.default_generation_settings is not None:
+            lines.append("  generation settings:")
+            settings = self.default_generation_settings
+            subs = [
+                (f"{key}:", format_value(value))
+                for key, value in settings.model_dump(exclude_none=True, exclude={"params"}).items()
+            ]
+            lines.extend(f"    {label:<15}{value}" for label, value in subs)
+            if settings.params is not None:
+                params = settings.params.render_lines()
+                if params:
+                    lines.append("        params:")
+                    lines.extend(f"          {label:<19}{value}" for label, value in params)
+        return "\n".join(lines)
