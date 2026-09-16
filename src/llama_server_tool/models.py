@@ -34,9 +34,9 @@ Example:
 
 from datetime import datetime, timezone
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
-from .server import ApiError
+from .server import ApiError, ServerError, fetch_json, resolve_server_url
 
 
 def format_params(value: int) -> str:
@@ -123,3 +123,12 @@ class ModelList(BaseModel):
             return f"models: {self.error.message}"
         body = "\n".join(info.render() for info in self.data)
         return f"models:\n{body}"
+
+
+def get_models(server: str | None = None) -> ModelList:
+    """Query GET /v1/models and return the validated ModelList model."""
+    _, body = fetch_json(resolve_server_url(server), "/v1/models")
+    try:
+        return ModelList.model_validate(body)
+    except ValidationError as err:
+        raise ServerError(f"invalid response body: {err}") from err

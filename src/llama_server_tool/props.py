@@ -99,9 +99,9 @@ By default, it is read-only. To make POST request to change global properties, y
 
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
-from .server import ApiError, format_value
+from .server import ApiError, ServerError, fetch_json, format_value, resolve_server_url
 
 
 class GenerationParams(BaseModel):
@@ -193,3 +193,15 @@ class Props(BaseModel):
                     lines.append("        params:")
                     lines.extend(f"          {label:<19}{value}" for label, value in params)
         return "\n".join(lines)
+
+
+def get_props(server: str | None = None, model: str | None = None, autoload: bool = False) -> Props:
+    """Query GET /props and return the validated Props model."""
+    params = None
+    if model is not None:
+        params = {"model": model, "autoload": "true" if autoload else "false"}
+    _, body = fetch_json(resolve_server_url(server), "/props", params=params)
+    try:
+        return Props.model_validate(body)
+    except ValidationError as err:
+        raise ServerError(f"invalid response body: {err}") from err

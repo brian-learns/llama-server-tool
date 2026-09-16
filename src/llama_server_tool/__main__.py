@@ -3,40 +3,33 @@
 
 """Command line tool to administer a local llama-server."""
 
-import json
-
 import typer
-from pydantic import ValidationError
 
-from .health import Health
-from .metrics import MetricsReport, parse_exposition
-from .models import ModelList
-from .props import Props
-from .server import ServerError, fetch, fetch_json, resolve_server_url
+from .health import check_health
+from .metrics import get_metrics
+from .models import get_models
+from .props import get_props
+from .server import ServerError
 
 app = typer.Typer()
 
 
-# Without an explicit callback, typer collapses a single registered command into the
-# root command, which would break the `llama-server-tool health` subcommand form.
-@app.callback()
-def main_callback() -> None:
+# The explicit callback prints the command list when no subcommand is given.
+@app.callback(invoke_without_command=True)
+def main_callback(ctx: typer.Context) -> None:
     """Administer a local llama-server."""
+    if ctx.invoked_subcommand is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
 
 
 @app.command()
 def health(server: str | None = typer.Option(None, help="Base URL of the llama-server.")) -> None:
     """Check server health via GET /health."""
-    base = resolve_server_url(server)
     try:
-        _, body = fetch_json(base, "/health")
+        result = check_health(server)
     except ServerError as err:
         typer.echo(f"health: {err}", err=True)
-        raise typer.Exit(code=1) from err
-    try:
-        result = Health.model_validate(body)
-    except ValidationError as err:
-        typer.echo(f"health: invalid response body: {err}", err=True)
         raise typer.Exit(code=1) from err
     typer.echo(result.render())
     if result.error is not None or result.status != "ok":
@@ -46,19 +39,13 @@ def health(server: str | None = typer.Option(None, help="Base URL of the llama-s
 @app.command()
 def models(server: str | None = typer.Option(None, help="Base URL of the llama-server.")) -> None:
     """Show the loaded model via GET /v1/models."""
-    base = resolve_server_url(server)
     try:
-        status, body = fetch_json(base, "/v1/models")
+        result = get_models(server)
     except ServerError as err:
         typer.echo(f"models: {err}", err=True)
         raise typer.Exit(code=1) from err
-    try:
-        result = ModelList.model_validate(body)
-    except ValidationError as err:
-        typer.echo(f"models: invalid response body: {err}", err=True)
-        raise typer.Exit(code=1) from err
     typer.echo(result.render())
-    if result.error is not None or status != 200:
+    if result.error is not None:
         raise typer.Exit(code=1)
 
 
@@ -69,22 +56,13 @@ def props(
     autoload: bool = typer.Option(False, help="Allow the server to load/pre-warm the model."),
 ) -> None:
     """Show server properties via GET /props."""
-    base = resolve_server_url(server)
-    params = None
-    if model is not None:
-        params = {"model": model, "autoload": "true" if autoload else "false"}
     try:
-        status, body = fetch_json(base, "/props", params=params)
+        result = get_props(server, model=model, autoload=autoload)
     except ServerError as err:
         typer.echo(f"props: {err}", err=True)
         raise typer.Exit(code=1) from err
-    try:
-        result = Props.model_validate(body)
-    except ValidationError as err:
-        typer.echo(f"props: invalid response body: {err}", err=True)
-        raise typer.Exit(code=1) from err
     typer.echo(result.render())
-    if result.error is not None or status != 200:
+    if result.error is not None:
         raise typer.Exit(code=1)
 
 
@@ -94,27 +72,14 @@ def metrics(
     model: str | None = typer.Option(None, help="Model id to query (required in router mode)."),
 ) -> None:
     """Show server metrics via GET /metrics (Prometheus format)."""
-    base = resolve_server_url(server)
-    params = {"model": model} if model is not None else None
     try:
-        status, text = fetch(base, "/metrics", params=params)
+        result = get_metrics(server, model=model)
     except ServerError as err:
         typer.echo(f"metrics: {err}", err=True)
         raise typer.Exit(code=1) from err
-    if status != 200:
-        try:
-            result = MetricsReport.model_validate(json.loads(text))
-        except ValueError:
-            typer.echo(f"metrics: HTTP {status}: {text.strip()}", err=True)
-            raise typer.Exit(code=1) from None
-        typer.echo(result.render())
+    typer.echo(result.render())
+    if result.error is not None:
         raise typer.Exit(code=1)
-    try:
-        families = parse_exposition(text)
-    except ValueError as err:
-        typer.echo(f"metrics: failed to parse exposition text: {err}", err=True)
-        raise typer.Exit(code=1) from err
-    typer.echo(MetricsReport(families=families).render())
 
 
 def main() -> None:

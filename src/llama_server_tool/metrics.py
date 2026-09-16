@@ -27,10 +27,12 @@ In *router mode* the query param `?model={model_id}` has to be set. This endpoin
 
 """
 
-from prometheus_client.parser import text_string_to_metric_families
-from pydantic import BaseModel
+import json
 
-from .server import ApiError, format_value
+from prometheus_client.parser import text_string_to_metric_families
+from pydantic import BaseModel, ValidationError
+
+from .server import ApiError, ServerError, fetch, format_value, resolve_server_url
 
 
 class MetricSample(BaseModel):
@@ -90,3 +92,18 @@ def parse_exposition(text: str) -> list[MetricFamilyEntry]:
             )
         )
     return entries
+
+
+def get_metrics(server: str | None = None, model: str | None = None) -> MetricsReport:
+    """Query GET /metrics and return the validated MetricsReport model."""
+    params = {"model": model} if model is not None else None
+    status, text = fetch(resolve_server_url(server), "/metrics", params=params)
+    if status != 200:
+        try:
+            return MetricsReport.model_validate(json.loads(text))
+        except ValueError as err:
+            raise ServerError(f"HTTP {status}: {text.strip()}") from err
+    try:
+        return MetricsReport(families=parse_exposition(text))
+    except (ValueError, ValidationError) as err:
+        raise ServerError(f"failed to parse exposition text: {err}") from err

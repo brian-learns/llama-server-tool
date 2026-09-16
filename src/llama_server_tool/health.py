@@ -13,9 +13,9 @@ This endpoint is public (no API key check). `/v1/health` also works.
   - Explanation: the model is successfully loaded and the server is ready.
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
-from .server import ApiError
+from .server import ApiError, ServerError, fetch_json, resolve_server_url
 
 
 class Health(BaseModel):
@@ -31,3 +31,12 @@ class Health(BaseModel):
         if self.error is not None:
             return f"health: {self.error.message}"
         return "health: unknown response"
+
+
+def check_health(server: str | None = None) -> Health:
+    """Query GET /health and return the validated Health model."""
+    _, body = fetch_json(resolve_server_url(server), "/health")
+    try:
+        return Health.model_validate(body)
+    except ValidationError as err:
+        raise ServerError(f"invalid response body: {err}") from err
