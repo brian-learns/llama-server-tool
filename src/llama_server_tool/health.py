@@ -15,20 +15,14 @@ This endpoint is public (no API key check). `/v1/health` also works.
 
 from pydantic import BaseModel
 
-
-class HealthError(BaseModel):
-    """Error object returned by the server when it is unhealthy."""
-
-    code: int
-    message: str
-    type: str
+from .server import ApiError
 
 
 class Health(BaseModel):
     """`GET /health` response body, validated and rendered by pydantic."""
 
     status: str | None = None
-    error: HealthError | None = None
+    error: ApiError | None = None
 
     def render(self) -> str:
         """Format the health result for output."""

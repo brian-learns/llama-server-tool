@@ -6,29 +6,12 @@
 import httpx
 from typer.testing import CliRunner
 
+from helpers import FakeGet, json_response
 from llama_server_tool.__main__ import app
-from llama_server_tool.health import Health, HealthError
+from llama_server_tool.health import Health
+from llama_server_tool.server import ApiError
 
 runner = CliRunner()
-
-
-class FakeGet:
-    """Stand-in for httpx.get that records calls and returns a fixed response or raises."""
-
-    def __init__(self, response=None, error=None):
-        self.response = response
-        self.error = error
-        self.urls = []
-
-    def __call__(self, url, timeout=None):
-        self.urls.append(url)
-        if self.error is not None:
-            raise self.error
-        return self.response
-
-
-def json_response(body, status_code=200):
-    return httpx.Response(status_code, json=body, request=httpx.Request("GET", "http://x/health"))
 
 
 def run_health(monkeypatch, fake, *args):
@@ -58,8 +41,15 @@ def test_health_connection_error(monkeypatch):
     assert "health: connection refused" in result.stderr
 
 
-def test_health_malformed_body(monkeypatch):
+def test_health_malformed_json(monkeypatch):
     fake = FakeGet(response=httpx.Response(200, text="not json", request=httpx.Request("GET", "x")))
+    result = run_health(monkeypatch, fake)
+    assert result.exit_code == 1
+    assert "invalid JSON from /health" in result.stderr
+
+
+def test_health_unexpected_body(monkeypatch):
+    fake = FakeGet(response=json_response({"error": "not-an-object"}))
     result = run_health(monkeypatch, fake)
     assert result.exit_code == 1
     assert "invalid response body" in result.stderr
@@ -96,7 +86,7 @@ def test_model_renders_status():
 
 
 def test_model_renders_error():
-    error = HealthError(code=503, message="Loading model", type="unavailable_error")
+    error = ApiError(code=503, message="Loading model", type="unavailable_error")
     assert Health(error=error).render() == "health: Loading model"
 
 
