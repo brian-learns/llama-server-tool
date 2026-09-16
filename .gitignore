@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: 0BSD
+# Copyright (c) 2026 llama_server_tool creators and contributors
+
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Tool caches
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.vulture_cache/
+.uv/
+
+# Virtual environments
+.venv
+.venv-*
