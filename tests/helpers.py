@@ -14,10 +14,12 @@ class FakeGet:
         self.error = error
         self.urls = []
         self.params = None
+        self.timeout = None
 
     def __call__(self, url, timeout=None, params=None):
         self.urls.append(url)
         self.params = params
+        self.timeout = timeout
         if self.error is not None:
             raise self.error
         return self.response
@@ -40,6 +42,8 @@ class FakeAsyncClient:
         self.response = response
         self.error = error
         self.calls = []
+        self.timeout = None
+        self.client_timeout = None
 
     async def __aenter__(self):
         return self
@@ -49,6 +53,7 @@ class FakeAsyncClient:
 
     async def get(self, url, timeout=None, params=None):
         self.calls.append((url, params))
+        self.timeout = timeout
         if self.error is not None:
             raise self.error
         return self.response

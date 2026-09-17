@@ -33,7 +33,12 @@ def async_client(monkeypatch, response=None, error=None):
     import llama_server_tool.server as server_module
 
     fake = FakeAsyncClient(response=response, error=error)
-    monkeypatch.setattr(server_module.httpx, "AsyncClient", lambda *a, **k: fake)
+
+    def make_client(*a, **k):
+        fake.client_timeout = k.get("timeout")
+        return fake
+
+    monkeypatch.setattr(server_module.httpx, "AsyncClient", make_client)
     return fake
 
 
@@ -77,6 +82,17 @@ def test_aget_props_params(monkeypatch):
     assert fake.calls[-1] == ("http://127.0.0.0:8080/props", {"model": "x", "autoload": "true"})
     run(aget_props())
     assert fake.calls[-1] == ("http://127.0.0.0:8080/props", None)
+
+
+def test_aget_props_autoload_timeout(monkeypatch):
+    fake = async_client(monkeypatch, response=json_response(PROPS_BODY))
+    run(aget_props(model="x", autoload=True))
+    assert fake.client_timeout.read == 300.0
+    assert fake.client_timeout.connect == 5.0
+    run(aget_props(model="x", autoload=True, timeout=60))
+    assert fake.client_timeout.read == 60.0
+    run(aget_props(model="x"))
+    assert fake.client_timeout.read == 5.0
 
 
 def test_aget_metrics_ok(monkeypatch):

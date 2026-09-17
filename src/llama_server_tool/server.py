@@ -12,6 +12,8 @@ from pydantic import BaseModel
 
 DEFAULT_SERVER = "http://127.0.0.0:8080"
 REQUEST_TIMEOUT = 5.0
+CONNECT_TIMEOUT = 5.0
+AUTOLOAD_TIMEOUT = 300.0
 
 
 class ServerError(Exception):
@@ -43,37 +45,53 @@ def format_value(value: object) -> str:
     return str(value)
 
 
-def fetch(base: str, path: str, params: dict[str, str] | None = None) -> tuple[int, str]:
+def _request_timeout(timeout: float | None) -> httpx.Timeout:
+    """Build the request timeout: the given (or default) read timeout, 5 s connect."""
+    read = timeout if timeout is not None else REQUEST_TIMEOUT
+    return httpx.Timeout(read, connect=CONNECT_TIMEOUT)
+
+
+def fetch(base: str, path: str, params: dict[str, str] | None = None, timeout: float | None = None) -> tuple[int, str]:
     """GET an endpoint, returning (status code, response text)."""
     try:
-        response = httpx.get(f"{base}{path}", timeout=REQUEST_TIMEOUT, params=params)
+        response = httpx.get(f"{base}{path}", timeout=_request_timeout(timeout), params=params)
+    except httpx.TimeoutException as err:
+        raise ServerError(f"timed out after {_request_timeout(timeout).read}s") from err
     except httpx.HTTPError as err:
         raise ServerError(str(err)) from err
     return response.status_code, response.text
 
 
-def fetch_json(base: str, path: str, params: dict[str, str] | None = None) -> tuple[int, dict[str, Any]]:
+def fetch_json(
+    base: str, path: str, params: dict[str, str] | None = None, timeout: float | None = None
+) -> tuple[int, dict[str, Any]]:
     """GET a JSON endpoint, returning (status code, parsed body)."""
-    status, text = fetch(base, path, params=params)
+    status, text = fetch(base, path, params=params, timeout=timeout)
     try:
         return status, json.loads(text)
     except ValueError as err:
         raise ServerError(f"invalid JSON from {path}: {err}") from err
 
 
-async def afetch(base: str, path: str, params: dict[str, str] | None = None) -> tuple[int, str]:
+async def afetch(
+    base: str, path: str, params: dict[str, str] | None = None, timeout: float | None = None
+) -> tuple[int, str]:
     """Async GET of an endpoint, returning (status code, response text)."""
-    async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
-        try:
+    try:
+        async with httpx.AsyncClient(timeout=_request_timeout(timeout)) as client:
             response = await client.get(f"{base}{path}", params=params)
-        except httpx.HTTPError as err:
-            raise ServerError(str(err)) from err
+    except httpx.TimeoutException as err:
+        raise ServerError(f"timed out after {_request_timeout(timeout).read}s") from err
+    except httpx.HTTPError as err:
+        raise ServerError(str(err)) from err
     return response.status_code, response.text
 
 
-async def afetch_json(base: str, path: str, params: dict[str, str] | None = None) -> tuple[int, dict[str, Any]]:
+async def afetch_json(
+    base: str, path: str, params: dict[str, str] | None = None, timeout: float | None = None
+) -> tuple[int, dict[str, Any]]:
     """Async GET of a JSON endpoint, returning (status code, parsed body)."""
-    status, text = await afetch(base, path, params=params)
+    status, text = await afetch(base, path, params=params, timeout=timeout)
     try:
         return status, json.loads(text)
     except ValueError as err:

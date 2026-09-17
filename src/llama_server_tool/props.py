@@ -102,6 +102,7 @@ from typing import Any
 from pydantic import BaseModel, Field, ValidationError
 
 from .server import (
+    AUTOLOAD_TIMEOUT,
     ApiError,
     ServerError,
     afetch_json,
@@ -217,15 +218,28 @@ def _props_from(body: dict[str, Any]) -> Props:
         raise ServerError(f"invalid response body: {err}") from err
 
 
-def get_props(server: str | None = None, model: str | None = None, autoload: bool = False) -> Props:
+def _props_timeout(autoload: bool, timeout: float | None) -> float | None:
+    """Read timeout for a /props request; autoload holds the response until the model loads."""
+    if timeout is not None:
+        return timeout
+    return AUTOLOAD_TIMEOUT if autoload else None
+
+
+def get_props(
+    server: str | None = None, model: str | None = None, autoload: bool = False, timeout: float | None = None
+) -> Props:
     """Query GET /props and return the validated Props model."""
     params = _props_params(model, autoload)
-    _, body = fetch_json(resolve_server_url(server), "/props", params=params)
+    _, body = fetch_json(resolve_server_url(server), "/props", params=params, timeout=_props_timeout(autoload, timeout))
     return _props_from(body)
 
 
-async def aget_props(server: str | None = None, model: str | None = None, autoload: bool = False) -> Props:
+async def aget_props(
+    server: str | None = None, model: str | None = None, autoload: bool = False, timeout: float | None = None
+) -> Props:
     """Async version of get_props()."""
     params = _props_params(model, autoload)
-    _, body = await afetch_json(resolve_server_url(server), "/props", params=params)
+    _, body = await afetch_json(
+        resolve_server_url(server), "/props", params=params, timeout=_props_timeout(autoload, timeout)
+    )
     return _props_from(body)

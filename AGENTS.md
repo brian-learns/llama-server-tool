@@ -88,6 +88,9 @@ in the wheel); this file covers *developing* it.
 - `props` must default to `autoload=false` when a model is given:
   `?model=<id>` without it makes the server load the model into memory and
   pre-warm it.
+- `/props?autoload=true` **holds the response until the model is loaded** —
+  the tool uses `AUTOLOAD_TIMEOUT` (300 s) as its read timeout for that (5 s
+  connect stays); explicit `timeout=`/`--timeout` wins.
 - `/metrics` output is numbers only — safe to inspect live.
 
 ## Workflow

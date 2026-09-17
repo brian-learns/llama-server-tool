@@ -77,6 +77,9 @@ props:
 - `--model <id>` queries one model. The default is `autoload=false`, so the
   query never makes the server load or pre-warm the model; pass `--autoload`
   to opt in.
+- `--autoload` holds the request until the model is loaded, so it uses a
+  5-minute read timeout by default; override with `--timeout <seconds>`
+  (or `timeout=` in the API).
 - The chat template is raw Jinja2 and is intentionally not printed.
 
 ### metrics — `GET /metrics`

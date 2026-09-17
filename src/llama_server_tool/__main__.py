@@ -55,10 +55,11 @@ def props(
     server: str | None = typer.Option(None, help="Base URL of the llama-server."),
     model: str | None = typer.Option(None, help="Model id to query; nothing is loaded by default."),
     autoload: bool = typer.Option(False, help="Allow the server to load/pre-warm the model."),
+    timeout: float | None = typer.Option(None, help="Read timeout in seconds (default 5; 300 with --autoload)."),
 ) -> None:
     """Show server properties via GET /props?model=<id> [--model ID]."""
     try:
-        result = get_props(server, model=model, autoload=autoload)
+        result = get_props(server, model=model, autoload=autoload, timeout=timeout)
     except ServerError as err:
         typer.echo(f"props: {err}", err=True)
         raise typer.Exit(code=1) from err

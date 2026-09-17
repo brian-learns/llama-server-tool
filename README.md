@@ -49,6 +49,10 @@ Every function also has an async twin for asyncio code — `aget_health()`,
 `aget_models()`, `aget_props(...)`, `aget_metrics(...)`, `aget_slots(...)` —
 with identical behavior and return types.
 
+`get_props(model=..., autoload=True)` (and its async twin) holds the request
+until the server has loaded the model, so it uses a 5-minute read timeout in
+that case (override with `timeout=` / `--timeout`).
+
 ## Development
 
 ```sh

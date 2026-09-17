@@ -4,12 +4,13 @@
 """Tests for the props command (CLI) and the Props model."""
 
 import httpx
+import pytest
 from typer.testing import CliRunner
 
 from helpers import FakeGet, json_response
 from llama_server_tool.__main__ import app
-from llama_server_tool.props import Props
-from llama_server_tool.server import format_value
+from llama_server_tool.props import Props, get_props
+from llama_server_tool.server import ServerError, format_value
 
 runner = CliRunner()
 
@@ -130,6 +131,57 @@ def test_props_empty_body_renders_without_crash():
 def test_props_omits_absent_fields():
     body = Props(model_path="m.gguf")
     assert body.render() == "props:\n  model_path:          m.gguf"
+
+
+def test_get_props_default_timeout(monkeypatch):
+    fake = FakeGet(response=json_response(SAMPLE_BODY))
+    monkeypatch.setattr(httpx, "get", fake)
+    get_props(model="x")
+    assert fake.timeout.read == 5.0
+    assert fake.timeout.connect == 5.0
+
+
+def test_get_props_autoload_timeout(monkeypatch):
+    fake = FakeGet(response=json_response(SAMPLE_BODY))
+    monkeypatch.setattr(httpx, "get", fake)
+    get_props(model="x", autoload=True)
+    assert fake.timeout.read == 300.0
+
+
+def test_get_props_explicit_timeout_wins(monkeypatch):
+    fake = FakeGet(response=json_response(SAMPLE_BODY))
+    monkeypatch.setattr(httpx, "get", fake)
+    get_props(model="x", autoload=True, timeout=60)
+    assert fake.timeout.read == 60.0
+
+
+def test_props_cli_autoload_timeout(monkeypatch):
+    fake = FakeGet(response=json_response(SAMPLE_BODY))
+    run_props(monkeypatch, fake, "--model", "x", "--autoload")
+    assert fake.timeout.read == 300.0
+
+
+def test_props_cli_timeout_override(monkeypatch):
+    fake = FakeGet(response=json_response(SAMPLE_BODY))
+    run_props(monkeypatch, fake, "--model", "x", "--autoload", "--timeout", "60")
+    assert fake.timeout.read == 60.0
+
+
+def test_props_cli_timeout_without_autoload(monkeypatch):
+    fake = FakeGet(response=json_response(SAMPLE_BODY))
+    run_props(monkeypatch, fake, "--timeout", "60")
+    assert fake.timeout.read == 60.0
+
+
+def test_fetch_timeout_message(monkeypatch):
+    def timed_out_get(url, timeout=None, params=None):
+        raise httpx.ReadTimeout("timed out")
+
+    monkeypatch.setattr(httpx, "get", timed_out_get)
+    with pytest.raises(ServerError, match="timed out after 300.0s"):
+        get_props(model="x", autoload=True)
+    with pytest.raises(ServerError, match="timed out after 5.0s"):
+        get_props()
 
 
 def test_format_value_rounds_floats():
