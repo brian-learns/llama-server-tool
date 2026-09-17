@@ -88,6 +88,18 @@ in the wheel); this file covers *developing* it.
 *Plan* (write `docs/NN_topic.md`), *Do* (code after user approves the plan),
 *Check* (user checks before git commit), *Act* (commit after approval).
 
+## Open items
+
+- `models` output: the user has filter ideas for the large registry list
+  (~47 models) — that feedback is the next phase; `slots` `params` rendering
+  will likely get the same treatment.
+- Router-mode subprocess ports are not exposed by the API (checked `/props`,
+  `/slots`, `/v1/models` on build b10988) — use `ss -tlnp | grep llama` at
+  the OS level if asked again.
+- `/props` on the dev build has extra fields the model deliberately ignores
+  (`model_ftype`, `bos/eos_token`, `endpoint_*` booleans, `ui*`,
+  `cors_proxy_enabled`) — candidates if props output is ever extended.
+
 ## Gotchas
 
 - `uv` >= 0.12 is required (checked by `make checkdeps`); the audit and
