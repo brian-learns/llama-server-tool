@@ -121,8 +121,8 @@ if health.error is not None:
     raise SystemExit(health.error.message)
 
 props = get_props(model="Qwen3.8-27B")
-print(props.model_path)          # field access for automation
-print(props.render())            # or the same report the CLI prints
+print(props.model_path)  # field access for automation
+print(props.render())  # or the same report the CLI prints
 ```
 
 `get_props(model=..., autoload=...)` and `get_metrics(model=...)` mirror the

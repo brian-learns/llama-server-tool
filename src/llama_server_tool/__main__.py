@@ -55,7 +55,7 @@ def props(
     model: str | None = typer.Option(None, help="Model id to query; nothing is loaded by default."),
     autoload: bool = typer.Option(False, help="Allow the server to load/pre-warm the model."),
 ) -> None:
-    """Show server properties via GET /props."""
+    """Show server properties via GET /props?model=<id> [--model ID]."""
     try:
         result = get_props(server, model=model, autoload=autoload)
     except ServerError as err:
@@ -71,7 +71,10 @@ def metrics(
     server: str | None = typer.Option(None, help="Base URL of the llama-server."),
     model: str | None = typer.Option(None, help="Model id to query (required in router mode)."),
 ) -> None:
-    """Show server metrics via GET /metrics (Prometheus format)."""
+    """Show server metrics via GET /metrics?model=<id> [--model ID].
+
+    Prometheus exposition format; the server must be started with --metrics,
+    and router mode requires a model id."""
     try:
         result = get_metrics(server, model=model)
     except ServerError as err:
