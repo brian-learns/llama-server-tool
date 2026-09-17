@@ -155,6 +155,21 @@ def test_get_props_explicit_timeout_wins(monkeypatch):
     assert fake.timeout.read == 60.0
 
 
+def test_props_json_prints_template(monkeypatch):
+    fake = FakeGet(response=json_response(SAMPLE_BODY))
+    result = run_props(monkeypatch, fake, "--json")
+    assert result.exit_code == 0
+    assert TEMPLATE in result.output
+    assert result.output.lstrip().startswith("{")
+
+
+def test_props_json_autoload_timeout(monkeypatch):
+    fake = FakeGet(response=json_response(SAMPLE_BODY))
+    run_props(monkeypatch, fake, "x", "--autoload", "--json")
+    assert fake.params == {"model": "x", "autoload": "true"}
+    assert fake.timeout.read == 300.0
+
+
 def test_props_cli_autoload_timeout(monkeypatch):
     fake = FakeGet(response=json_response(SAMPLE_BODY))
     run_props(monkeypatch, fake, "x", "--autoload")

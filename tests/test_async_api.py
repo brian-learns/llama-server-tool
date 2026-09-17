@@ -4,6 +4,7 @@
 """Tests for the async Python API (aget_*) exposed at the package root."""
 
 import asyncio
+import json
 
 import httpx
 import pytest
@@ -93,6 +94,13 @@ def test_aget_props_autoload_timeout(monkeypatch):
     assert fake.client_timeout.read == 60.0
     run(aget_props(model="x"))
     assert fake.client_timeout.read == 5.0
+
+
+def test_aget_models_raw(monkeypatch):
+    async_client(monkeypatch, response=json_response(MODELS_BODY))
+    status, body = run(aget_models(raw=True))
+    assert status == 200
+    assert json.loads(body)["data"][0]["id"] == "../models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
 
 
 def test_aget_metrics_ok(monkeypatch):

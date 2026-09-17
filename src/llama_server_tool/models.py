@@ -33,11 +33,11 @@ Example:
 """
 
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Literal, overload
 
 from pydantic import BaseModel, ValidationError
 
-from .server import ApiError, ServerError, afetch_json, fetch_json, resolve_server_url
+from .server import ApiError, ServerError, afetch, afetch_json, fetch, fetch_json, resolve_server_url
 
 
 def format_params(value: int) -> str:
@@ -138,13 +138,37 @@ def _models_from(body: dict[str, Any]) -> ModelList:
         raise ServerError(f"invalid response body: {err}") from err
 
 
-def get_models(server: str | None = None) -> ModelList:
-    """Query GET /v1/models and return the validated ModelList model."""
+@overload
+def get_models(server: str | None = None, *, raw: Literal[True]) -> tuple[int, str]:
+    """Raw variant: return (status, body) without validation."""
+
+
+@overload
+def get_models(server: str | None = None, raw: bool = False) -> ModelList:
+    """Return the validated model (default)."""
+
+
+def get_models(server: str | None = None, raw: bool = False) -> "ModelList | tuple[int, str]":
+    """Query GET /v1/models; returns the validated ModelList, or (status, body) with raw=True."""
+    if raw:
+        return fetch(resolve_server_url(server), "/v1/models")
     _, body = fetch_json(resolve_server_url(server), "/v1/models")
     return _models_from(body)
 
 
-async def aget_models(server: str | None = None) -> ModelList:
+@overload
+async def aget_models(server: str | None = None, *, raw: Literal[True]) -> tuple[int, str]:
+    """Raw variant: return (status, body) without validation."""
+
+
+@overload
+async def aget_models(server: str | None = None, raw: bool = False) -> ModelList:
+    """Return the validated model (default)."""
+
+
+async def aget_models(server: str | None = None, raw: bool = False) -> "ModelList | tuple[int, str]":
     """Async version of get_models()."""
+    if raw:
+        return await afetch(resolve_server_url(server), "/v1/models")
     _, body = await afetch_json(resolve_server_url(server), "/v1/models")
     return _models_from(body)

@@ -3,6 +3,8 @@
 
 """Tests for the health command (CLI) and the Health model."""
 
+import json
+
 import httpx
 from typer.testing import CliRunner
 
@@ -39,6 +41,22 @@ def test_health_connection_error(monkeypatch):
     result = run_health(monkeypatch, fake)
     assert result.exit_code == 1
     assert "health: connection refused" in result.stderr
+
+
+def test_health_json_prints_raw_body(monkeypatch):
+    fake = FakeGet(response=json_response({"status": "ok"}))
+    result = run_health(monkeypatch, fake, "--json")
+    assert result.exit_code == 0
+    assert json.loads(result.output) == {"status": "ok"}
+    assert "health:" not in result.output
+
+
+def test_health_json_503_prints_raw_body_and_exits_1(monkeypatch):
+    body = {"error": {"code": 503, "message": "Loading model", "type": "unavailable_error"}}
+    fake = FakeGet(response=json_response(body, status_code=503))
+    result = run_health(monkeypatch, fake, "--json")
+    assert result.exit_code == 1
+    assert json.loads(result.output)["error"]["message"] == "Loading model"
 
 
 def test_health_malformed_json(monkeypatch):

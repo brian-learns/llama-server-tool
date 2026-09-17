@@ -51,6 +51,12 @@ def test_metrics_model_param(monkeypatch):
     assert fake.params == {"model": "foo"}
 
 
+def test_metrics_has_no_json_option():
+    result = runner.invoke(app, ["metrics", "--help"])
+    assert result.exit_code == 0
+    assert "--json" not in result.output
+
+
 def test_metrics_no_model_no_params(monkeypatch):
     fake = FakeGet(response=text_response(SAMPLE_TEXT))
     run_metrics(monkeypatch, fake)

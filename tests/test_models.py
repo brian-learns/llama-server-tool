@@ -3,6 +3,8 @@
 
 """Tests for the models command (CLI) and the ModelList/ModelInfo models."""
 
+import json
+
 import httpx
 from typer.testing import CliRunner
 
@@ -121,6 +123,59 @@ def test_model_list_match():
     assert [m.id for m in ml.match("other.gguf").data] == ["other.gguf"]
     assert ml.match("missing.gguf").data == []
     assert ml.match("OTHER.GGUF").data == []  # exact match is case-sensitive
+
+
+def test_models_json_prints_raw_body(monkeypatch):
+    fake = FakeGet(response=json_response(SAMPLE_BODY))
+    result = run_models(monkeypatch, fake, "--json")
+    assert result.exit_code == 0
+    assert "models:" not in result.output
+    assert json.loads(result.output)["data"][0]["id"] == "../models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
+
+
+def test_models_json_model_filter(monkeypatch):
+    body = {
+        "object": "list",
+        "data": [SAMPLE_BODY["data"][0], {**SAMPLE_BODY["data"][0], "id": "other.gguf"}],
+    }
+    fake = FakeGet(response=json_response(body))
+    result = run_models(monkeypatch, fake, "../models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf", "--json")
+    assert result.exit_code == 0
+    parsed = json.loads(result.output)
+    assert parsed["object"] == "list"
+    assert [m["id"] for m in parsed["data"]] == ["../models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"]
+
+
+def test_models_json_model_filter_preserves_unknown_fields(monkeypatch):
+    entry = {**SAMPLE_BODY["data"][0], "id": "other.gguf", "router_url": "http://x:1"}
+    body = {"object": "list", "data": [SAMPLE_BODY["data"][0], entry]}
+    fake = FakeGet(response=json_response(body))
+    result = run_models(monkeypatch, fake, "other.gguf", "--json")
+    assert result.exit_code == 0
+    assert json.loads(result.output)["data"][0]["router_url"] == "http://x:1"
+
+
+def test_models_json_model_no_match(monkeypatch):
+    fake = FakeGet(response=json_response(SAMPLE_BODY))
+    result = run_models(monkeypatch, fake, "nosuchmodel", "--json")
+    assert result.exit_code == 1
+    assert "models: no model with id 'nosuchmodel'" in result.stderr
+
+
+def test_models_json_model_503_prints_error_body(monkeypatch):
+    body = {"error": {"code": 503, "message": "Loading model", "type": "unavailable_error"}}
+    fake = FakeGet(response=json_response(body, status_code=503))
+    result = run_models(monkeypatch, fake, "any", "--json")
+    assert result.exit_code == 1
+    assert json.loads(result.output)["error"]["message"] == "Loading model"
+
+
+def test_models_json_503_prints_raw_body_and_exits_1(monkeypatch):
+    body = {"error": {"code": 503, "message": "Loading model", "type": "unavailable_error"}}
+    fake = FakeGet(response=json_response(body, status_code=503))
+    result = run_models(monkeypatch, fake, "--json")
+    assert result.exit_code == 1
+    assert json.loads(result.output)["error"]["message"] == "Loading model"
 
 
 def test_model_list_renders_full_report():

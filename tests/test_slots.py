@@ -3,6 +3,8 @@
 
 """Tests for the slots command (CLI) and the SlotsReport/Slot models."""
 
+import json
+
 import httpx
 import pytest
 from typer.testing import CliRunner
@@ -50,6 +52,14 @@ def test_slots_ok(monkeypatch):
     assert "n_decoded:     136" in result.output
     assert "  slot 1:" in result.output
     assert "is_processing: false" in result.output
+
+
+def test_slots_json_prints_raw_body(monkeypatch):
+    fake = FakeGet(response=json_response(SAMPLE_BODY))
+    result = run_slots(monkeypatch, fake, "Ornith-1.0-9B", "--json")
+    assert result.exit_code == 0
+    assert "slots (Ornith-1.0-9B):" not in result.output
+    assert json.loads(result.output)[0]["id"] == 0
 
 
 def test_slots_model_param(monkeypatch):

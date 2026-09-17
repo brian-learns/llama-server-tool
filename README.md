@@ -17,6 +17,12 @@ Commands that query a specific model take it as a positional argument
 (`props MODEL`, `metrics MODEL`, `slots MODEL`). `models MODEL` filters the
 registry client-side to the entry with that exact id.
 
+`health`, `models`, `props`, and `slots` take `--json` to print the
+server's raw JSON response body instead of the formatted report — for
+scripting, e.g. `llama-server-tool models --json | jq '.data[].id'`.
+`models MODEL --json` filters the JSON to that exact id. Note `props
+--json` includes the full `chat_template`.
+
 ## Server URL
 
 All commands take `--server <url>`; without it, the `LLAMA_SERVER_URL`

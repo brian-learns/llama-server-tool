@@ -27,6 +27,23 @@ Two invocation paths: `llama-server-tool ...` (when installed) and
 Every command takes `--server <url>`. Without it, the `LLAMA_SERVER_URL`
 environment variable is used, falling back to `http://127.0.0.0:8080`.
 
+## Raw JSON output
+
+`health`, `models`, `props`, and `slots` take `--json` to print the
+server's response body verbatim (the server's own JSON — fields the
+formatted report omits are included). Exit 0 on 2xx, 1 otherwise, so error
+bodies stay in the pipe:
+
+```
+$ llama-server-tool models --json | jq '.data[].id'
+$ llama-server-tool models Qwen3.8-27B --json   # filtered to that exact id
+```
+
+`models MODEL --json` filters the JSON to the exact id (same envelope, so
+the same `jq` expressions work). `metrics` has no `--json` (its report is
+parsed from Prometheus exposition text). **`props --json` prints the full
+`chat_template` (raw Jinja2).**
+
 ## Commands
 
 ### health — `GET /health`

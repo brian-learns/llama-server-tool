@@ -147,6 +147,7 @@ If query param `?fail_on_no_slot=1` is set, this endpoint will respond with stat
 """
 
 import json
+from typing import Literal, overload
 
 from pydantic import BaseModel, ValidationError
 
@@ -224,15 +225,43 @@ def _slots_from(status: int, text: str, model: str | None) -> SlotsReport:
         raise ServerError(f"failed to parse slots response: {err}") from err
 
 
-def get_slots(server: str | None = None, model: str | None = None) -> SlotsReport:
-    """Query GET /slots and return the validated SlotsReport model."""
+@overload
+def get_slots(server: str | None = None, model: str | None = None, *, raw: Literal[True]) -> tuple[int, str]:
+    """Raw variant: return (status, body) without validation."""
+
+
+@overload
+def get_slots(server: str | None = None, model: str | None = None, raw: bool = False) -> SlotsReport:
+    """Return the validated model (default)."""
+
+
+def get_slots(
+    server: str | None = None, model: str | None = None, raw: bool = False
+) -> "SlotsReport | tuple[int, str]":
+    """Query GET /slots; returns the validated SlotsReport, or (status, body) with raw=True."""
     params = {"model": model} if model is not None else None
+    if raw:
+        return fetch(resolve_server_url(server), "/slots", params=params)
     status, text = fetch(resolve_server_url(server), "/slots", params=params)
     return _slots_from(status, text, model)
 
 
-async def aget_slots(server: str | None = None, model: str | None = None) -> SlotsReport:
+@overload
+async def aget_slots(server: str | None = None, model: str | None = None, *, raw: Literal[True]) -> tuple[int, str]:
+    """Raw variant: return (status, body) without validation."""
+
+
+@overload
+async def aget_slots(server: str | None = None, model: str | None = None, raw: bool = False) -> SlotsReport:
+    """Return the validated model (default)."""
+
+
+async def aget_slots(
+    server: str | None = None, model: str | None = None, raw: bool = False
+) -> "SlotsReport | tuple[int, str]":
     """Async version of get_slots()."""
     params = {"model": model} if model is not None else None
+    if raw:
+        return await afetch(resolve_server_url(server), "/slots", params=params)
     status, text = await afetch(resolve_server_url(server), "/slots", params=params)
     return _slots_from(status, text, model)

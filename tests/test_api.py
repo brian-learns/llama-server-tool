@@ -3,6 +3,8 @@
 
 """Tests for the Python API functions exposed at the package root."""
 
+import json
+
 import httpx
 import pytest
 
@@ -80,6 +82,20 @@ def test_get_props_returns_model(monkeypatch):
     result = get_props()
     assert isinstance(result, Props)
     assert result.model_path == "../models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
+
+
+def test_check_health_raw(monkeypatch):
+    with_fake(monkeypatch, FakeGet(response=json_response({"status": "ok"})))
+    status, body = check_health(raw=True)
+    assert status == 200
+    assert json.loads(body) == {"status": "ok"}
+
+
+def test_get_models_raw(monkeypatch):
+    with_fake(monkeypatch, FakeGet(response=json_response(MODELS_BODY)))
+    status, body = get_models(raw=True)
+    assert status == 200
+    assert json.loads(body)["data"][0]["id"] == "../models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
 
 
 def test_get_metrics_ok(monkeypatch):

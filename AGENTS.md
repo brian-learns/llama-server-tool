@@ -67,6 +67,14 @@ in the wheel); this file covers *developing* it.
   private `_x_from()` helper; the sync function and its `aget_*` twin are thin
   wrappers over `fetch*`/`afetch*` that share that helper — keep them in lockstep
   (a parity test in `tests/test_async_api.py` guards this).
+- **Raw output**: `--json` (health/models/props/slots; not metrics) prints
+  the body verbatim. The API exposes it as `raw=True` on `get_*`/`aget_*`,
+  returning `(status, body)` — typed with `@overload` (`raw: Literal[True]`
+  must stay keyword-only and *required* in the first overload so default
+  calls still resolve to the model). CLI exits 0 on 2xx, 1 otherwise, so
+  error bodies stay in the pipe. `models [MODEL] --json` filters the parsed
+  body in CLI glue (`_filter_models_json`, exact id, keeps the envelope and
+  unknown fields; 2xx only).
 - **typer**: keep the explicit root `@app.callback(invoke_without_command=True)`
   — it prints the command list on bare invocation and prevents typer from
   collapsing a single command into the root.
@@ -85,6 +93,8 @@ in the wheel); this file covers *developing* it.
   Jinja2 system-prompt template and dumping it has crashed agent sessions.
   `Props.render()` deliberately shows only `<hidden: N chars>`; keep it that
   way, and don't curl `/props` during development — use synthetic fixtures.
+  (`props --json` exists for the user's own terminal use; this rule still
+  binds agents — check only `jq 'keys'` or specific non-template fields.)
 - `props` must default to `autoload=false` when a model is given:
   `?model=<id>` without it makes the server load the model into memory and
   pre-warm it.

@@ -97,7 +97,7 @@ By default, it is read-only. To make POST request to change global properties, y
 
 """
 
-from typing import Any
+from typing import Any, Literal, overload
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -105,7 +105,9 @@ from .server import (
     AUTOLOAD_TIMEOUT,
     ApiError,
     ServerError,
+    afetch,
     afetch_json,
+    fetch,
     fetch_json,
     format_value,
     resolve_server_url,
@@ -225,21 +227,79 @@ def _props_timeout(autoload: bool, timeout: float | None) -> float | None:
     return AUTOLOAD_TIMEOUT if autoload else None
 
 
+@overload
 def get_props(
-    server: str | None = None, model: str | None = None, autoload: bool = False, timeout: float | None = None
+    server: str | None = None,
+    *,
+    raw: Literal[True],
+    model: str | None = None,
+    autoload: bool = False,
+    timeout: float | None = None,
+) -> tuple[int, str]:
+    """Raw variant: return (status, body) without validation."""
+
+
+@overload
+def get_props(
+    server: str | None = None,
+    model: str | None = None,
+    autoload: bool = False,
+    timeout: float | None = None,
+    raw: bool = False,
 ) -> Props:
-    """Query GET /props and return the validated Props model."""
+    """Return the validated model (default)."""
+
+
+def get_props(
+    server: str | None = None,
+    model: str | None = None,
+    autoload: bool = False,
+    timeout: float | None = None,
+    raw: bool = False,
+) -> "Props | tuple[int, str]":
+    """Query GET /props; returns the validated Props model, or (status, body) with raw=True."""
     params = _props_params(model, autoload)
-    _, body = fetch_json(resolve_server_url(server), "/props", params=params, timeout=_props_timeout(autoload, timeout))
+    read_timeout = _props_timeout(autoload, timeout)
+    if raw:
+        return fetch(resolve_server_url(server), "/props", params=params, timeout=read_timeout)
+    _, body = fetch_json(resolve_server_url(server), "/props", params=params, timeout=read_timeout)
     return _props_from(body)
 
 
+@overload
 async def aget_props(
-    server: str | None = None, model: str | None = None, autoload: bool = False, timeout: float | None = None
+    server: str | None = None,
+    *,
+    raw: Literal[True],
+    model: str | None = None,
+    autoload: bool = False,
+    timeout: float | None = None,
+) -> tuple[int, str]:
+    """Raw variant: return (status, body) without validation."""
+
+
+@overload
+async def aget_props(
+    server: str | None = None,
+    model: str | None = None,
+    autoload: bool = False,
+    timeout: float | None = None,
+    raw: bool = False,
 ) -> Props:
+    """Return the validated model (default)."""
+
+
+async def aget_props(
+    server: str | None = None,
+    model: str | None = None,
+    autoload: bool = False,
+    timeout: float | None = None,
+    raw: bool = False,
+) -> "Props | tuple[int, str]":
     """Async version of get_props()."""
     params = _props_params(model, autoload)
-    _, body = await afetch_json(
-        resolve_server_url(server), "/props", params=params, timeout=_props_timeout(autoload, timeout)
-    )
+    read_timeout = _props_timeout(autoload, timeout)
+    if raw:
+        return await afetch(resolve_server_url(server), "/props", params=params, timeout=read_timeout)
+    _, body = await afetch_json(resolve_server_url(server), "/props", params=params, timeout=read_timeout)
     return _props_from(body)

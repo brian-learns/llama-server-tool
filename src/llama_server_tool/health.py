@@ -13,11 +13,11 @@ This endpoint is public (no API key check). `/v1/health` also works.
   - Explanation: the model is successfully loaded and the server is ready.
 """
 
-from typing import Any
+from typing import Any, Literal, overload
 
 from pydantic import BaseModel, ValidationError
 
-from .server import ApiError, ServerError, afetch_json, fetch_json, resolve_server_url
+from .server import ApiError, ServerError, afetch, afetch_json, fetch, fetch_json, resolve_server_url
 
 
 class Health(BaseModel):
@@ -43,13 +43,37 @@ def _health_from(body: dict[str, Any]) -> Health:
         raise ServerError(f"invalid response body: {err}") from err
 
 
-def check_health(server: str | None = None) -> Health:
-    """Query GET /health and return the validated Health model."""
+@overload
+def check_health(server: str | None = None, *, raw: Literal[True]) -> tuple[int, str]:
+    """Raw variant: return (status, body) without validation."""
+
+
+@overload
+def check_health(server: str | None = None, raw: bool = False) -> Health:
+    """Return the validated model (default)."""
+
+
+def check_health(server: str | None = None, raw: bool = False) -> "Health | tuple[int, str]":
+    """Query GET /health; returns the validated Health model, or (status, body) with raw=True."""
+    if raw:
+        return fetch(resolve_server_url(server), "/health")
     _, body = fetch_json(resolve_server_url(server), "/health")
     return _health_from(body)
 
 
-async def aget_health(server: str | None = None) -> Health:
+@overload
+async def aget_health(server: str | None = None, *, raw: Literal[True]) -> tuple[int, str]:
+    """Raw variant: return (status, body) without validation."""
+
+
+@overload
+async def aget_health(server: str | None = None, raw: bool = False) -> Health:
+    """Return the validated model (default)."""
+
+
+async def aget_health(server: str | None = None, raw: bool = False) -> "Health | tuple[int, str]":
     """Async version of check_health()."""
+    if raw:
+        return await afetch(resolve_server_url(server), "/health")
     _, body = await afetch_json(resolve_server_url(server), "/health")
     return _health_from(body)
