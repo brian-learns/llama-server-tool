@@ -89,8 +89,38 @@ def test_models_malformed_json(monkeypatch):
 
 def test_models_server_option(monkeypatch):
     fake = FakeGet(response=json_response(SAMPLE_BODY))
-    run_models(monkeypatch, fake, "--server", "http://127.0.0.1:9999")
+    run_models(monkeypatch, fake, "../models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf", "--server", "http://127.0.0.1:9999")
     assert fake.urls == ["http://127.0.0.1:9999/v1/models"]
+
+
+def test_models_positional_exact_match(monkeypatch):
+    body = {
+        "object": "list",
+        "data": [SAMPLE_BODY["data"][0], {**SAMPLE_BODY["data"][0], "id": "other.gguf"}],
+    }
+    fake = FakeGet(response=json_response(body))
+    result = run_models(monkeypatch, fake, "../models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf")
+    assert result.exit_code == 0
+    assert "id:         ../models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf" in result.output
+    assert "other.gguf" not in result.output
+
+
+def test_models_positional_no_match(monkeypatch):
+    fake = FakeGet(response=json_response(SAMPLE_BODY))
+    result = run_models(monkeypatch, fake, "nosuchmodel")
+    assert result.exit_code == 1
+    assert "models: no model with id 'nosuchmodel'" in result.stderr
+
+
+def test_model_list_match():
+    body = {
+        "object": "list",
+        "data": [SAMPLE_BODY["data"][0], {**SAMPLE_BODY["data"][0], "id": "other.gguf"}],
+    }
+    ml = ModelList.model_validate(body)
+    assert [m.id for m in ml.match("other.gguf").data] == ["other.gguf"]
+    assert ml.match("missing.gguf").data == []
+    assert ml.match("OTHER.GGUF").data == []  # exact match is case-sensitive
 
 
 def test_model_list_renders_full_report():

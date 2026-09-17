@@ -63,14 +63,14 @@ def test_props_ok_hides_template(monkeypatch):
 
 def test_props_model_param_default_autoload_false(monkeypatch):
     fake = FakeGet(response=json_response(SAMPLE_BODY))
-    run_props(monkeypatch, fake, "--model", "foo")
+    run_props(monkeypatch, fake, "foo")
     assert fake.urls == ["http://127.0.0.0:8080/props"]
     assert fake.params == {"model": "foo", "autoload": "false"}
 
 
 def test_props_model_param_autoload_true(monkeypatch):
     fake = FakeGet(response=json_response(SAMPLE_BODY))
-    run_props(monkeypatch, fake, "--model", "foo", "--autoload")
+    run_props(monkeypatch, fake, "foo", "--autoload")
     assert fake.params == {"model": "foo", "autoload": "true"}
 
 
@@ -157,13 +157,13 @@ def test_get_props_explicit_timeout_wins(monkeypatch):
 
 def test_props_cli_autoload_timeout(monkeypatch):
     fake = FakeGet(response=json_response(SAMPLE_BODY))
-    run_props(monkeypatch, fake, "--model", "x", "--autoload")
+    run_props(monkeypatch, fake, "x", "--autoload")
     assert fake.timeout.read == 300.0
 
 
 def test_props_cli_timeout_override(monkeypatch):
     fake = FakeGet(response=json_response(SAMPLE_BODY))
-    run_props(monkeypatch, fake, "--model", "x", "--autoload", "--timeout", "60")
+    run_props(monkeypatch, fake, "x", "--autoload", "--timeout", "60")
     assert fake.timeout.read == 60.0
 
 

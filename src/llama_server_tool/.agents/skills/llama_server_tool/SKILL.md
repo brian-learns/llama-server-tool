@@ -41,7 +41,9 @@ server is unreachable.
 
 ### models — `GET /v1/models`
 
-Lists the registered models with metadata (params, context, size).
+Lists the registered models with metadata (params, context, size). The
+optional positional `MODEL` filters client-side to the entry with that exact
+id (no match → exit 1).
 
 ```
 $ llama-server-tool models
@@ -61,7 +63,7 @@ models:
 Server properties and default generation settings.
 
 ```
-$ llama-server-tool props --model Qwen3.8-27B
+$ llama-server-tool props Qwen3.8-27B
 props:
   model_path:          /home/.../Qwen3.8-27B-UD-Q4_K_XL.gguf
   total_slots:         4
@@ -74,9 +76,9 @@ props:
       ...
 ```
 
-- `--model <id>` queries one model. The default is `autoload=false`, so the
-  query never makes the server load or pre-warm the model; pass `--autoload`
-  to opt in.
+- The positional `MODEL` queries one model. The default is `autoload=false`,
+  so the query never makes the server load or pre-warm the model; pass
+  `--autoload` to opt in.
 - `--autoload` holds the request until the model is loaded, so it uses a
   5-minute read timeout by default; override with `--timeout <seconds>`
   (or `timeout=` in the API).
@@ -87,7 +89,7 @@ props:
 Prometheus metrics (throughput, token totals, busy slots, spec-decode stats).
 
 ```
-$ llama-server-tool metrics --model Qwen3.8-27B
+$ llama-server-tool metrics Qwen3.8-27B
 metrics:
   llamacpp:predicted_tokens_seconds (gauge)
     Average generation throughput in tokens/s
@@ -99,7 +101,8 @@ metrics:
 
 - The server must be started with `--metrics` (otherwise exit 1 with the
   server's 501 message).
-- In router mode `--model <id>` is required (otherwise the server answers 400).
+- In router mode the positional `MODEL` is required (otherwise the server
+  answers 400).
 
 ### slots — `GET /slots`
 
@@ -107,7 +110,7 @@ Per-slot busy state (which slots are processing, context size, tokens
 decoded).
 
 ```
-$ llama-server-tool slots --model Qwen3.8-27B
+$ llama-server-tool slots Qwen3.8-27B
 slots (Qwen3.8-27B):
   slot 0:
     is_processing: true
@@ -117,7 +120,8 @@ slots (Qwen3.8-27B):
     n_decoded:     136
 ```
 
-In router mode `--model <id>` is required (otherwise the server answers 400).
+In router mode the positional `MODEL` is required (otherwise the server
+answers 400).
 
 ## Exit codes
 

@@ -42,7 +42,7 @@ def run_slots(monkeypatch, fake, *args):
 
 def test_slots_ok(monkeypatch):
     fake = FakeGet(response=json_response(SAMPLE_BODY))
-    result = run_slots(monkeypatch, fake, "--model", "Ornith-1.0-9B")
+    result = run_slots(monkeypatch, fake, "Ornith-1.0-9B")
     assert result.exit_code == 0
     assert "slots (Ornith-1.0-9B):" in result.output
     assert "  slot 0:" in result.output
@@ -54,7 +54,7 @@ def test_slots_ok(monkeypatch):
 
 def test_slots_model_param(monkeypatch):
     fake = FakeGet(response=json_response(SAMPLE_BODY))
-    run_slots(monkeypatch, fake, "--model", "foo")
+    run_slots(monkeypatch, fake, "foo")
     assert fake.urls == ["http://127.0.0.0:8080/slots"]
     assert fake.params == {"model": "foo"}
     run_slots(monkeypatch, fake)

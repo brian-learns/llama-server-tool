@@ -38,13 +38,21 @@ def health(server: str | None = typer.Option(None, help="Base URL of the llama-s
 
 
 @app.command()
-def models(server: str | None = typer.Option(None, help="Base URL of the llama-server.")) -> None:
-    """Show the loaded model via GET /v1/models."""
+def models(
+    model: str | None = typer.Argument(None, help="Model id to show (exact match)."),
+    server: str | None = typer.Option(None, help="Base URL of the llama-server."),
+) -> None:
+    """Show the loaded model via GET /v1/models [MODEL]."""
     try:
         result = get_models(server)
     except ServerError as err:
         typer.echo(f"models: {err}", err=True)
         raise typer.Exit(code=1) from err
+    if model is not None and result.error is None:
+        result = result.match(model)
+        if not result.data:
+            typer.echo(f"models: no model with id '{model}'", err=True)
+            raise typer.Exit(code=1)
     typer.echo(result.render())
     if result.error is not None:
         raise typer.Exit(code=1)
@@ -52,12 +60,12 @@ def models(server: str | None = typer.Option(None, help="Base URL of the llama-s
 
 @app.command()
 def props(
+    model: str | None = typer.Argument(None, help="Model id to query; nothing is loaded by default."),
     server: str | None = typer.Option(None, help="Base URL of the llama-server."),
-    model: str | None = typer.Option(None, help="Model id to query; nothing is loaded by default."),
     autoload: bool = typer.Option(False, help="Allow the server to load/pre-warm the model."),
     timeout: float | None = typer.Option(None, help="Read timeout in seconds (default 5; 300 with --autoload)."),
 ) -> None:
-    """Show server properties via GET /props?model=<id> [--model ID]."""
+    """Show server properties via GET /props?model=<id> [MODEL]."""
     try:
         result = get_props(server, model=model, autoload=autoload, timeout=timeout)
     except ServerError as err:
@@ -70,10 +78,10 @@ def props(
 
 @app.command()
 def metrics(
+    model: str | None = typer.Argument(None, help="Model id to query (required in router mode)."),
     server: str | None = typer.Option(None, help="Base URL of the llama-server."),
-    model: str | None = typer.Option(None, help="Model id to query (required in router mode)."),
 ) -> None:
-    """Show server metrics via GET /metrics?model=<id> [--model ID].
+    """Show server metrics via GET /metrics?model=<id> [MODEL].
 
     Prometheus exposition format; the server must be started with --metrics,
     and router mode requires a model id."""
@@ -89,10 +97,10 @@ def metrics(
 
 @app.command()
 def slots(
+    model: str | None = typer.Argument(None, help="Model id to query (required in router mode)."),
     server: str | None = typer.Option(None, help="Base URL of the llama-server."),
-    model: str | None = typer.Option(None, help="Model id to query (required in router mode)."),
 ) -> None:
-    """Show slot state via GET /slots?model=<id> [--model ID]."""
+    """Show slot state via GET /slots?model=<id> [MODEL]."""
     try:
         result = get_slots(server, model=model)
     except ServerError as err:

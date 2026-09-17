@@ -46,7 +46,7 @@ def test_metrics_ok(monkeypatch):
 
 def test_metrics_model_param(monkeypatch):
     fake = FakeGet(response=text_response(SAMPLE_TEXT))
-    run_metrics(monkeypatch, fake, "--model", "foo")
+    run_metrics(monkeypatch, fake, "foo")
     assert fake.urls == ["http://127.0.0.0:8080/metrics"]
     assert fake.params == {"model": "foo"}
 

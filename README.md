@@ -13,6 +13,10 @@ Each command wraps one server endpoint and prints a formatted report:
 | `metrics` | `GET /metrics` | Prometheus metrics (throughput, token totals, busy slots) |
 | `slots` | `GET /slots` | per-slot busy state (processing, context, tokens decoded) |
 
+Commands that query a specific model take it as a positional argument
+(`props MODEL`, `metrics MODEL`, `slots MODEL`). `models MODEL` filters the
+registry client-side to the entry with that exact id.
+
 ## Server URL
 
 All commands take `--server <url>`; without it, the `LLAMA_SERVER_URL`

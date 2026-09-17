@@ -125,6 +125,10 @@ class ModelList(BaseModel):
         body = "\n".join(info.render() for info in self.data)
         return f"models:\n{body}"
 
+    def match(self, query: str) -> "ModelList":
+        """Return only the entries whose id equals the query (exact match)."""
+        return ModelList(data=[info for info in self.data if info.id == query])
+
 
 def _models_from(body: dict[str, Any]) -> ModelList:
     """Validate a /v1/models response body as a ModelList model."""
