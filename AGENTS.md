@@ -20,6 +20,9 @@ root:
   `prometheus_client`) → `get_metrics()`
 - `slots` — `GET /slots` (JSON array of slot objects) → `get_slots()`
 
+Every API function has an async twin (`aget_health()`, `aget_models()`,
+`aget_props()`, `aget_metrics()`, `aget_slots()`) for asyncio consumers.
+
 ## Development commands
 
 Makefile is (ab)used to run developer commands — `make` to see all targets.
@@ -60,6 +63,10 @@ in the wheel); this file covers *developing* it.
   `ValidationError` as `ServerError("invalid response body: ...")`. Commands
   catch `ServerError` → stderr + `typer.Exit(1)`, render the model, and exit 1
   when `.error` is set (or `status != "ok"` for health).
+- **Async parity**: each endpoint module keeps its response-handling logic in a
+  private `_x_from()` helper; the sync function and its `aget_*` twin are thin
+  wrappers over `fetch*`/`afetch*` that share that helper — keep them in lockstep
+  (a parity test in `tests/test_async_api.py` guards this).
 - **typer**: keep the explicit root `@app.callback(invoke_without_command=True)`
   — it prints the command list on bare invocation and prevents typer from
   collapsing a single command into the root.

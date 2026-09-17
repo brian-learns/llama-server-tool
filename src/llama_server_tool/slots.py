@@ -151,7 +151,7 @@ import json
 from pydantic import BaseModel, ValidationError
 
 from .props import GenerationParams
-from .server import ApiError, ServerError, fetch, format_value, resolve_server_url
+from .server import ApiError, ServerError, afetch, fetch, format_value, resolve_server_url
 
 
 class SlotNextToken(BaseModel):
@@ -208,10 +208,8 @@ class SlotsReport(BaseModel):
         return "\n".join([header, *(slot.render() for slot in self.slots)])
 
 
-def get_slots(server: str | None = None, model: str | None = None) -> SlotsReport:
-    """Query GET /slots and return the validated SlotsReport model."""
-    params = {"model": model} if model is not None else None
-    status, text = fetch(resolve_server_url(server), "/slots", params=params)
+def _slots_from(status: int, text: str, model: str | None) -> SlotsReport:
+    """Build a SlotsReport from a /slots response (error body or list of slots)."""
     if status != 200:
         try:
             return SlotsReport.model_validate(json.loads(text))
@@ -224,3 +222,17 @@ def get_slots(server: str | None = None, model: str | None = None) -> SlotsRepor
         return SlotsReport(model_name=model, slots=[Slot.model_validate(item) for item in items])
     except (ValueError, ValidationError) as err:
         raise ServerError(f"failed to parse slots response: {err}") from err
+
+
+def get_slots(server: str | None = None, model: str | None = None) -> SlotsReport:
+    """Query GET /slots and return the validated SlotsReport model."""
+    params = {"model": model} if model is not None else None
+    status, text = fetch(resolve_server_url(server), "/slots", params=params)
+    return _slots_from(status, text, model)
+
+
+async def aget_slots(server: str | None = None, model: str | None = None) -> SlotsReport:
+    """Async version of get_slots()."""
+    params = {"model": model} if model is not None else None
+    status, text = await afetch(resolve_server_url(server), "/slots", params=params)
+    return _slots_from(status, text, model)

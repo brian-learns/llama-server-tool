@@ -99,9 +99,16 @@ By default, it is read-only. To make POST request to change global properties, y
 
 from typing import Any
 
-from pydantic import BaseModel, ValidationError, Field
+from pydantic import BaseModel, Field, ValidationError
 
-from .server import ApiError, ServerError, fetch_json, format_value, resolve_server_url
+from .server import (
+    ApiError,
+    ServerError,
+    afetch_json,
+    fetch_json,
+    format_value,
+    resolve_server_url,
+)
 
 
 class GenerationParams(BaseModel):
@@ -195,13 +202,30 @@ class Props(BaseModel):
         return "\n".join(lines)
 
 
-def get_props(server: str | None = None, model: str | None = None, autoload: bool = False) -> Props:
-    """Query GET /props and return the validated Props model."""
-    params = None
-    if model is not None:
-        params = {"model": model, "autoload": "true" if autoload else "false"}
-    _, body = fetch_json(resolve_server_url(server), "/props", params=params)
+def _props_params(model: str | None, autoload: bool) -> dict[str, str] | None:
+    """Build the /props query params; None when no model is queried."""
+    if model is None:
+        return None
+    return {"model": model, "autoload": "true" if autoload else "false"}
+
+
+def _props_from(body: dict[str, Any]) -> Props:
+    """Validate a /props response body as a Props model."""
     try:
         return Props.model_validate(body)
     except ValidationError as err:
         raise ServerError(f"invalid response body: {err}") from err
+
+
+def get_props(server: str | None = None, model: str | None = None, autoload: bool = False) -> Props:
+    """Query GET /props and return the validated Props model."""
+    params = _props_params(model, autoload)
+    _, body = fetch_json(resolve_server_url(server), "/props", params=params)
+    return _props_from(body)
+
+
+async def aget_props(server: str | None = None, model: str | None = None, autoload: bool = False) -> Props:
+    """Async version of get_props()."""
+    params = _props_params(model, autoload)
+    _, body = await afetch_json(resolve_server_url(server), "/props", params=params)
+    return _props_from(body)

@@ -33,10 +33,11 @@ Example:
 """
 
 from datetime import datetime, timezone
+from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
-from .server import ApiError, ServerError, fetch_json, resolve_server_url
+from .server import ApiError, ServerError, afetch_json, fetch_json, resolve_server_url
 
 
 def format_params(value: int) -> str:
@@ -125,10 +126,21 @@ class ModelList(BaseModel):
         return f"models:\n{body}"
 
 
-def get_models(server: str | None = None) -> ModelList:
-    """Query GET /v1/models and return the validated ModelList model."""
-    _, body = fetch_json(resolve_server_url(server), "/v1/models")
+def _models_from(body: dict[str, Any]) -> ModelList:
+    """Validate a /v1/models response body as a ModelList model."""
     try:
         return ModelList.model_validate(body)
     except ValidationError as err:
         raise ServerError(f"invalid response body: {err}") from err
+
+
+def get_models(server: str | None = None) -> ModelList:
+    """Query GET /v1/models and return the validated ModelList model."""
+    _, body = fetch_json(resolve_server_url(server), "/v1/models")
+    return _models_from(body)
+
+
+async def aget_models(server: str | None = None) -> ModelList:
+    """Async version of get_models()."""
+    _, body = await afetch_json(resolve_server_url(server), "/v1/models")
+    return _models_from(body)

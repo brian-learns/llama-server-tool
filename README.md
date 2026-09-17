@@ -41,9 +41,13 @@ print(props.render())            # or the same report the CLI prints
 ```
 
 Available: `check_health()`, `get_models()`, `get_props(model=...,
-autoload=...)`, `get_metrics(model=...)`, plus the models
-(`Health`, `ModelList`, `Props`, `MetricsReport`) and
+autoload=...)`, `get_metrics(model=...)`, `get_slots(model=...)`, plus the
+models (`Health`, `ModelList`, `Props`, `MetricsReport`, `SlotsReport`) and
 `ApiError` / `ServerError`.
+
+Every function also has an async twin for asyncio code — `aget_health()`,
+`aget_models()`, `aget_props(...)`, `aget_metrics(...)`, `aget_slots(...)` —
+with identical behavior and return types.
 
 ## Development
 

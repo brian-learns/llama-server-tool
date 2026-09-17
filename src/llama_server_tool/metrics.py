@@ -32,7 +32,7 @@ import json
 from prometheus_client.parser import text_string_to_metric_families
 from pydantic import BaseModel, ValidationError
 
-from .server import ApiError, ServerError, fetch, format_value, resolve_server_url
+from .server import ApiError, ServerError, afetch, fetch, format_value, resolve_server_url
 
 
 class MetricSample(BaseModel):
@@ -94,10 +94,8 @@ def parse_exposition(text: str) -> list[MetricFamilyEntry]:
     return entries
 
 
-def get_metrics(server: str | None = None, model: str | None = None) -> MetricsReport:
-    """Query GET /metrics and return the validated MetricsReport model."""
-    params = {"model": model} if model is not None else None
-    status, text = fetch(resolve_server_url(server), "/metrics", params=params)
+def _metrics_from(status: int, text: str) -> MetricsReport:
+    """Build a MetricsReport from a /metrics response (error body or exposition text)."""
     if status != 200:
         try:
             return MetricsReport.model_validate(json.loads(text))
@@ -107,3 +105,17 @@ def get_metrics(server: str | None = None, model: str | None = None) -> MetricsR
         return MetricsReport(families=parse_exposition(text))
     except (ValueError, ValidationError) as err:
         raise ServerError(f"failed to parse exposition text: {err}") from err
+
+
+def get_metrics(server: str | None = None, model: str | None = None) -> MetricsReport:
+    """Query GET /metrics and return the validated MetricsReport model."""
+    params = {"model": model} if model is not None else None
+    status, text = fetch(resolve_server_url(server), "/metrics", params=params)
+    return _metrics_from(status, text)
+
+
+async def aget_metrics(server: str | None = None, model: str | None = None) -> MetricsReport:
+    """Async version of get_metrics()."""
+    params = {"model": model} if model is not None else None
+    status, text = await afetch(resolve_server_url(server), "/metrics", params=params)
+    return _metrics_from(status, text)

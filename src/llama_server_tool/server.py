@@ -59,3 +59,22 @@ def fetch_json(base: str, path: str, params: dict[str, str] | None = None) -> tu
         return status, json.loads(text)
     except ValueError as err:
         raise ServerError(f"invalid JSON from {path}: {err}") from err
+
+
+async def afetch(base: str, path: str, params: dict[str, str] | None = None) -> tuple[int, str]:
+    """Async GET of an endpoint, returning (status code, response text)."""
+    async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
+        try:
+            response = await client.get(f"{base}{path}", params=params)
+        except httpx.HTTPError as err:
+            raise ServerError(str(err)) from err
+    return response.status_code, response.text
+
+
+async def afetch_json(base: str, path: str, params: dict[str, str] | None = None) -> tuple[int, dict[str, Any]]:
+    """Async GET of a JSON endpoint, returning (status code, parsed body)."""
+    status, text = await afetch(base, path, params=params)
+    try:
+        return status, json.loads(text)
+    except ValueError as err:
+        raise ServerError(f"invalid JSON from {path}: {err}") from err

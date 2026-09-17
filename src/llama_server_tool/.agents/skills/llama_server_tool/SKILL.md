@@ -143,7 +143,15 @@ print(props.model_path)  # field access for automation
 print(props.render())  # or the same report the CLI prints
 ```
 
-`get_props(model=..., autoload=...)` and `get_metrics(model=...)` mirror the
-CLI options; the models are `Health`, `ModelList`, `Props`, `MetricsReport`,
-with `ApiError` / `ServerError` for error types. The package is typed
-(`py.typed`).
+`get_props(model=..., autoload=...)`, `get_metrics(model=...)` and
+`get_slots(model=...)` mirror the CLI options; the models are `Health`,
+`ModelList`, `Props`, `MetricsReport`, `SlotsReport`, with `ApiError` /
+`ServerError` for error types. The package is typed (`py.typed`).
+
+Every function has an async twin for asyncio code (`aget_health()`,
+`aget_models()`, `aget_props(...)`, `aget_metrics()`, `aget_slots(...)`) with
+identical behavior and return types:
+
+```python
+props = await llama_server_tool.aget_props(model="Qwen3.8-27B")
+```

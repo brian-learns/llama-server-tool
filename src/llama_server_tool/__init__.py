@@ -8,12 +8,12 @@ The API functions return validated pydantic models; well-formed API error bodies
 transport and parse failures raise `ServerError`.
 """
 
-from .health import Health, check_health
-from .metrics import MetricsReport, get_metrics
-from .models import ModelList, get_models
-from .props import Props, get_props
+from .health import Health, aget_health, check_health
+from .metrics import MetricsReport, aget_metrics, get_metrics
+from .models import ModelList, aget_models, get_models
+from .props import Props, aget_props, get_props
 from .server import ApiError, ServerError
-from .slots import Slot, SlotsReport, get_slots
+from .slots import Slot, SlotsReport, aget_slots, get_slots
 
 __all__ = [
     "ApiError",
@@ -24,6 +24,11 @@ __all__ = [
     "ServerError",
     "Slot",
     "SlotsReport",
+    "aget_health",
+    "aget_metrics",
+    "aget_models",
+    "aget_props",
+    "aget_slots",
     "check_health",
     "get_metrics",
     "get_models",
