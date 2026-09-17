@@ -14,7 +14,8 @@ llama-server. One command per endpoint, same logic importable from the package
 root:
 
 - `health` — `GET /health` → `check_health()`
-- `models` — `GET /v1/models` → `get_models()`
+- `models` — `GET /v1/models` (quoted-id list; `--loaded`/modality
+  filters, `--show-modalities`/`--show-meta` table) → `get_models()`
 - `props` — `GET /props` → `get_props(model=..., autoload=...)`
 - `metrics` — `GET /metrics` (Prometheus exposition text, parsed via
   `prometheus_client`) → `get_metrics()`
@@ -82,7 +83,15 @@ in the wheel); this file covers *developing* it.
   calls still resolve to the model). CLI exits 0 on 2xx, 1 otherwise, so
   error bodies stay in the pipe. `models [MODEL] --json` filters the parsed
   body in CLI glue (`_filter_models_json`, exact id, keeps the envelope and
-  unknown fields; 2xx only).
+  unknown fields; 2xx only). For `models` the other filters are
+  display-only: `--json` combined with any of them is an error.
+- **models list**: default render is one quoted id per line. `ModelList`
+  keeps `select()` (loaded/modality filters, AND semantics) and
+  `render(show_modalities, show_meta, meta_fields)` (aligned table;
+  explicit `meta_fields` are strict, the default set lenient). `meta` is an
+  unpinned `dict[str, Any]` (build-dependent keys; `vocab_type` can be a
+  bool). The modality flags keep underscores — typer would dash-ify the
+  parameter names otherwise.
 - **typer**: keep the explicit root `@app.callback(invoke_without_command=True)`
   — it prints the command list on bare invocation and prevents typer from
   collapsing a single command into the root.
@@ -118,9 +127,8 @@ in the wheel); this file covers *developing* it.
 
 ## Open items
 
-- `models` output: the user has filter ideas for the large registry list
-  (~47 models) — that feedback is the next phase; `slots` `params` rendering
-  will likely get the same treatment.
+- `slots` `params` rendering will likely get table treatment like
+  `models --show-meta` (phase 13).
 - Router-mode subprocess ports *are* exposed by `/v1/models`: each registry
   entry has `status.args` (the subprocess launch argv — `--port`/`--host`
   are in there) and `status.value` (`loaded`/`unloaded`). `ModelStatus`

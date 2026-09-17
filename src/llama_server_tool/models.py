@@ -32,12 +32,21 @@ Example:
 ```
 """
 
-from datetime import datetime, timezone
+from collections.abc import Sequence
 from typing import Any, Literal, overload
 
 from pydantic import BaseModel, ValidationError
 
-from .server import ApiError, ServerError, afetch, afetch_json, fetch, fetch_json, resolve_server_url
+from .server import (
+    ApiError,
+    ServerError,
+    afetch,
+    afetch_json,
+    fetch,
+    fetch_json,
+    format_value,
+    resolve_server_url,
+)
 
 
 def format_params(value: int) -> str:
@@ -51,41 +60,20 @@ def format_params(value: int) -> str:
 
 
 def format_bytes(value: int) -> str:
-    """Format a byte count with a decimal unit, e.g. 4912898304 -> '4.91 GB'."""
+    """Format a byte count with a decimal unit, e.g. 4912898304 -> '4.91GB'."""
     number = float(value)
     for unit in ("B", "KB", "MB", "GB", "TB"):
         if number < 1000.0 or unit == "TB":
-            return f"{int(number)} B" if unit == "B" else f"{number:.2f} {unit}"
+            return f"{int(number)}{unit}" if unit == "B" else f"{number:.2f}{unit}"
         number /= 1000.0
     raise AssertionError("unreachable")
 
 
-def format_created(created: int) -> str:
-    """Format a unix timestamp as a UTC string, e.g. 1735142223 -> '2024-12-25 15:57:03 UTC'."""
-    return datetime.fromtimestamp(created, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+class ModelArchitecture(BaseModel):
+    """The `architecture` field of /v1/models: which modalities a model accepts and produces."""
 
-
-class ModelMeta(BaseModel):
-    """Model metadata from llama.cpp (the `meta` field of /v1/models)."""
-
-    vocab_type: int
-    n_vocab: int
-    n_ctx_train: int
-    n_embd: int
-    n_params: int
-    size: int
-
-    def render(self) -> str:
-        """Format the metadata lines for output."""
-        lines = [
-            ("n_params:", format_params(self.n_params)),
-            ("n_ctx_train:", self.n_ctx_train),
-            ("n_embd:", self.n_embd),
-            ("n_vocab:", self.n_vocab),
-            ("size:", format_bytes(self.size)),
-            ("vocab_type:", self.vocab_type),
-        ]
-        return "\n".join(f"    {label:<13}{value}" for label, value in lines)
+    input_modalities: list[str] = []
+    output_modalities: list[str] = []
 
 
 def _arg_value(args: list[str], flag: str) -> str | None:
@@ -121,21 +109,12 @@ class ModelInfo(BaseModel):
     object: str = "model"
     created: int
     owned_by: str
-    meta: ModelMeta | None = None
+    meta: dict[str, Any] | None = None
+    architecture: ModelArchitecture | None = None
     status: ModelStatus | None = None
 
-    def render(self) -> str:
-        """Format the model info lines for output."""
-        lines = [
-            f"  id:         {self.id}",
-            f"  created:    {format_created(self.created)}",
-            f"  owned_by:   {self.owned_by}",
-        ]
-        if self.meta is None:
-            lines.append("  meta: (null — model may still be loading)")
-        else:
-            lines.extend(("  meta:", self.meta.render()))
-        return "\n".join(lines)
+
+DEFAULT_META_FIELDS = ["n_params", "n_ctx_train", "n_embd", "n_vocab", "size", "vocab_type"]
 
 
 class ModelList(BaseModel):
@@ -145,16 +124,88 @@ class ModelList(BaseModel):
     data: list[ModelInfo] = []
     error: ApiError | None = None
 
-    def render(self) -> str:
-        """Format the model list for output."""
-        if self.error is not None:
-            return f"models: {self.error.message}"
-        body = "\n".join(info.render() for info in self.data)
-        return f"models:\n{body}"
-
     def match(self, query: str) -> "ModelList":
         """Return only the entries whose id equals the query (exact match)."""
         return ModelList(data=[info for info in self.data if info.id == query])
+
+    def select(
+        self,
+        loaded: bool = False,
+        input_modalities: Sequence[str] = (),
+        output_modalities: Sequence[str] = (),
+    ) -> "ModelList":
+        """Filter entries by load state and modalities (each entry must support every requested modality)."""
+        data = self.data
+        if loaded:
+            data = [info for info in data if info.status is not None and info.status.value == "loaded"]
+        if input_modalities:
+            data = [
+                info
+                for info in data
+                if info.architecture is not None and set(input_modalities) <= set(info.architecture.input_modalities)
+            ]
+        if output_modalities:
+            data = [
+                info
+                for info in data
+                if info.architecture is not None and set(output_modalities) <= set(info.architecture.output_modalities)
+            ]
+        return ModelList(data=data)
+
+    def render(
+        self,
+        show_modalities: bool = False,
+        show_meta: bool = False,
+        meta_fields: Sequence[str] | None = None,
+    ) -> str:
+        """Format the model list: quoted ids, or a table with optional modality/meta columns."""
+        if self.error is not None:
+            return f"models: {self.error.message}"
+        if not self.data:
+            return ""
+        if not (show_modalities or show_meta):
+            return "\n".join(f'"{info.id}"' for info in self.data)
+        fields = list(meta_fields) if meta_fields is not None else DEFAULT_META_FIELDS
+        if show_meta and meta_fields is not None:
+            available = set().union(*(info.meta.keys() for info in self.data if info.meta is not None))
+            unknown = [field for field in fields if field not in available]
+            if unknown:
+                raise ValueError(
+                    f"unknown meta field(s) {', '.join(unknown)} (available: {', '.join(sorted(available))})"
+                )
+        rows: list[list[str]] = [["id"]]
+        if show_modalities:
+            rows[0] += ["input", "output"]
+        if show_meta:
+            rows[0] += fields
+        for info in self.data:
+            row = [f'"{info.id}"']
+            if show_modalities:
+                arch = info.architecture
+                row += [
+                    ",".join(arch.input_modalities) if arch is not None else "",
+                    ",".join(arch.output_modalities) if arch is not None else "",
+                ]
+            if show_meta:
+                row += [self._meta_cell(info, field) for field in fields]
+            rows.append(row)
+        widths = [max(len(cell) for cell in column) for column in zip(*rows, strict=True)]
+        return "\n".join(
+            " ".join(cell.ljust(width) for cell, width in zip(row, widths, strict=True)).rstrip() for row in rows
+        )
+
+    @staticmethod
+    def _meta_cell(info: ModelInfo, field: str) -> str:
+        """Format one meta value: n_params/size humanized, everything else via format_value."""
+        meta = info.meta
+        if meta is None or field not in meta:
+            return ""
+        value = meta[field]
+        if field == "n_params":
+            return format_params(value)
+        if field == "size":
+            return format_bytes(value)
+        return format_value(value)
 
 
 def _models_from(body: dict[str, Any]) -> ModelList:

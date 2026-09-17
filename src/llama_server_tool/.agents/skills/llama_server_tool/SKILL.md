@@ -58,21 +58,23 @@ server is unreachable.
 
 ### models — `GET /v1/models`
 
-Lists the registered models with metadata (params, context, size). The
-optional positional `MODEL` filters client-side to the entry with that exact
-id (no match → exit 1).
+The registry as quoted ids, one per line (pipe-friendly). Filters:
+`--loaded`, `--input_modalities` / `--output_modalities` (repeatable or
+comma-separated; a model must support **all** requested). Table columns:
+`--show-modalities` (input/output), `--show-meta` (implies `--loaded`;
+default columns `n_params n_ctx_train n_embd n_vocab size vocab_type`),
+`--meta-fields f1,f2` (implies `--show-meta`; unknown field → error). The
+positional `MODEL` filters client-side to the exact id (no match → exit 1).
+Empty filter results print nothing and exit 0. `--json` is mutually
+exclusive with the filters.
 
 ```
-$ llama-server-tool models
-models:
-  id:         Qwen3.8-27B
-  created:    2026-09-16 22:00:23 UTC
-  owned_by:   llamacpp
-  meta:
-    n_params:    27.32B
-    n_ctx_train: 262144
-    size:        17.55 GB
-    ...
+$ llama-server-tool models --loaded
+"Qwen3.8-27B"
+
+$ llama-server-tool models --loaded --show-meta
+id            n_params n_ctx_train n_embd n_vocab size    vocab_type
+"Qwen3.8-27B" 27.32B   262144      5120   248320 17.55GB true
 ```
 
 ### props — `GET /props`

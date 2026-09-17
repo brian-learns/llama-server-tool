@@ -8,7 +8,7 @@ Each command wraps one server endpoint and prints a formatted report:
 | Command | Endpoint | Shows |
 | ------- | -------- | ----- |
 | `health` | `GET /health` | whether the model is loaded and the server is ready |
-| `models` | `GET /v1/models` | the registered models and their metadata |
+| `models` | `GET /v1/models` | the model registry as quoted ids; filters (`--loaded`, `--input_modalities`, `--output_modalities`) and table columns (`--show-modalities`, `--show-meta`) |
 | `props` | `GET /props` | server properties and default generation settings |
 | `metrics` | `GET /metrics` | Prometheus metrics (throughput, token totals, busy slots) |
 | `slots` | `GET /slots` | per-slot busy state (processing, context, tokens decoded) |
@@ -21,8 +21,12 @@ registry client-side to the entry with that exact id.
 `health`, `models`, `props`, and `slots` take `--json` to print the
 server's raw JSON response body instead of the formatted report — for
 scripting, e.g. `llama-server-tool models --json | jq '.data[].id'`.
-`models MODEL --json` filters the JSON to that exact id. Note `props
---json` includes the full `chat_template`.
+`models MODEL --json` filters the JSON to that exact id; for `models` the
+filters are display-only, so `--json` cannot be combined with them. Note
+`props --json` includes the full `chat_template`.
+
+`models` prints one quoted id per line by default; `--show-modalities`
+and `--show-meta` (with `--meta-fields`) switch it to an aligned table.
 
 `status` is a watch-friendly board of the models that are actually loaded
 (make it a poor man's top with `watch -n 1 llama-server-tool status`); it

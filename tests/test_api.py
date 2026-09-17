@@ -63,7 +63,7 @@ def test_get_models(monkeypatch):
     with_fake(monkeypatch, FakeGet(response=json_response(MODELS_BODY)))
     result = get_models()
     assert isinstance(result, ModelList)
-    assert len(result.data) == 1
+    assert len(result.data) == 2
     assert result.data[0].id == "../models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
 
 

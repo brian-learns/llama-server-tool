@@ -71,7 +71,7 @@ def test_aget_health_connection_error(monkeypatch):
 def test_aget_models(monkeypatch):
     async_client(monkeypatch, response=json_response(MODELS_BODY))
     result = run(aget_models())
-    assert len(result.data) == 1
+    assert len(result.data) == 2
     assert result.data[0].id == "../models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
 
 
