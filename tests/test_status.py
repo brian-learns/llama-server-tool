@@ -239,8 +239,12 @@ def test_status_block_render_variants():
 
 
 def test_status_report_render():
+    server = StatusBlock(model="llama-server", port=8080)
     block = StatusBlock(model="m", port=1)
-    assert StatusReport(blocks=[block], system="FOOTER").render() == block.render() + "\n\nFOOTER"
+    assert StatusReport(server=server, blocks=[block], system="FOOTER").render() == (
+        server.render() + "\n\n" + block.render() + "\n\nFOOTER"
+    )
+    assert StatusReport(server=server).render() == server.render() + "\n\nstatus: no loaded models"
     assert StatusReport().render() == "status: no loaded models"
     assert (
         StatusReport(error=ModelList.model_validate({"error": {"code": 503, "message": "Loading model", "type": "unavailable_error"}}).error).render()
@@ -250,16 +254,37 @@ def test_status_report_render():
 
 def test_get_status_composition(monkeypatch):
     fake_status_env(monkeypatch)
-    monkeypatch.setattr(status_module, "find_pids_by_ports", lambda ports, proc_root="/proc": {48249: 342265})
-    monkeypatch.setattr(status_module, "read_proc_mem", lambda pid, proc_root="/proc": (21.71, 139.87))
-    monkeypatch.setattr(status_module, "nvidia_vram_by_pid", lambda timeout=5.0: {342265: 37.65})
+    seen_ports = []
+    monkeypatch.setattr(
+        status_module,
+        "find_pids_by_ports",
+        lambda ports, proc_root="/proc": seen_ports.append(set(ports)) or {8080: 111, 48249: 342265},
+    )
+    mems = {111: (0.39, 15.36), 342265: (21.71, 139.87)}
+    monkeypatch.setattr(status_module, "read_proc_mem", lambda pid, proc_root="/proc": mems[pid])
+    monkeypatch.setattr(status_module, "nvidia_vram_by_pid", lambda timeout=5.0: {111: 0.17, 342265: 37.65})
     report = status_module.get_status()
+    assert seen_ports == [{8080, 48249}]  # router port (from default URL) + subprocess port
+    assert report.server.model == "llama-server"
+    assert (report.server.pid, report.server.port) == (111, 8080)
+    assert (report.server.rss_gb, report.server.vsz_gb, report.server.vram_gb) == (0.39, 15.36, 0.17)
     assert [b.model for b in report.blocks] == ["Qwen3.8-27B"]  # unloaded model never shown
     block = report.blocks[0]
     assert (block.pid, block.port, block.host) == (342265, 48249, "127.0.0.1")
     assert (block.rss_gb, block.vsz_gb, block.vram_gb) == (21.71, 139.87, 37.65)
     assert [s.id for s in block.slots] == [0, 3]
     assert report.system == "MEM FOOTER"
+
+
+def test_get_status_router_port_from_url(monkeypatch):
+    fake_status_env(monkeypatch)
+    monkeypatch.setattr(status_module, "find_pids_by_ports", lambda ports, proc_root="/proc": {9931: 404576})
+    monkeypatch.setattr(status_module, "read_proc_mem", lambda pid, proc_root="/proc": (0.39, 15.36))
+    report = status_module.get_status(server="http://127.0.0.1:9931")
+    assert (report.server.pid, report.server.port) == (404576, 9931)
+    monkeypatch.setattr(status_module, "read_proc_mem", lambda pid, proc_root="/proc": None)
+    report = status_module.get_status(server="http://127.0.0.1")  # URL without port: llama-server default
+    assert (report.server.pid, report.server.port) == (None, 8080)
 
 
 def test_get_status_model_filter_and_no_system(monkeypatch):
@@ -289,6 +314,8 @@ def test_status_cli(monkeypatch):
     fake_status_env(monkeypatch)
     result = runner.invoke(app, ["status"])
     assert result.exit_code == 0
+    assert "llama-server (Port: 8080)" in result.output
+    assert result.output.index("llama-server (Port: 8080)") < result.output.index("Qwen3.8-27B (Port: 48249)")
     assert "Qwen3.8-27B (Port: 48249)" in result.output
     assert "Slot [3]: Status = PROCESSING | Context Ingested = 4433 tokens" in result.output
     assert "MEM FOOTER" in result.output

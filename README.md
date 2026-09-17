@@ -12,7 +12,7 @@ Each command wraps one server endpoint and prints a formatted report:
 | `props` | `GET /props` | server properties and default generation settings |
 | `metrics` | `GET /metrics` | Prometheus metrics (throughput, token totals, busy slots) |
 | `slots` | `GET /slots` | per-slot busy state (processing, context, tokens decoded) |
-| `status` | `GET /v1/models` + `GET /slots` + OS | board of loaded models: per-model memory (RSS/VSZ/VRAM), slot state, and a `free`/`nvidia-smi` footer (omit with `--no-system`) |
+| `status` | `GET /v1/models` + `GET /slots` + OS | board of loaded models: server header (router memory), per-model memory (RSS/VSZ/VRAM), slot state, and a `free`/`nvidia-smi` footer (omit with `--no-system`) |
 
 Commands that query a specific model take it as a positional argument
 (`props MODEL`, `metrics MODEL`, `slots MODEL`). `models MODEL` filters the
@@ -26,8 +26,9 @@ scripting, e.g. `llama-server-tool models --json | jq '.data[].id'`.
 
 `status` is a watch-friendly board of the models that are actually loaded
 (make it a poor man's top with `watch -n 1 llama-server-tool status`); it
-finds each subprocess's PID/port for the per-model memory lines and degrades
-gracefully when `/proc` or `nvidia-smi` are unavailable.
+opens with the router process itself (the `llama-server` header, port from
+the server URL), finds each subprocess's PID/port for the per-model memory
+lines, and degrades gracefully when `/proc` or `nvidia-smi` are unavailable.
 
 ## Server URL
 

@@ -204,3 +204,29 @@ Field mapping (confirmed from the script's jq lines):
   function already).
 - per-slot `params` rendering (separate open item).
 - polling `unloaded` models' slots; non-Linux memory collection.
+
+## 12.A addendum: `llama-server` header block
+
+Requested after the phase 12 commit: the board opens with a block for the
+router process itself, above the per-model blocks:
+
+```
+=================================================================
+llama-server (PID: 404576 | Port: 9931)
+ -> Unified System RAM (RSS): 0.39 GB
+ -> Virtual Memory Footprint: 15.36 GB
+ -> Dedicated Blackwell VRAM: 0.17 GB
+=================================================================
+```
+
+- Port: the resolved server URL's port (option > `LLAMA_SERVER_URL` >
+  default); a URL without an explicit port assumes 8080 (llama-server's
+  default). PID: the same one-shot `/proc/*/cmdline` scan — the router
+  port is just another entry in the port set, so no extra work.
+- VRAM: same one-shot `nvidia-smi --query-compute-apps` call, mapped by pid.
+- Shown unconditionally (also with `status MODEL` and with no loaded
+  models); not part of the `--no-system` footer. Degrades to
+  `llama-server (Port: N)` when the PID is not found (e.g. remote server
+  or `/proc` unavailable).
+- `StatusReport.server: StatusBlock | None` renders first; `get_status`
+  builds it from `urlsplit(resolve_server_url(server)).port or 8080`.

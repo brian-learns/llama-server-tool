@@ -5,10 +5,11 @@
 Composite `status` board: per-loaded-model memory and slot state, plus a
 host-level system footer.
 
-Ports the layout of the slots.sh maintenance script: one block per loaded
-model (header with PID/port, RSS/VSZ/VRAM, one line per slot) followed by
-`free` and `nvidia-smi` output. Intended for `watch -n 1 llama-server-tool
-status`.
+Ports the layout of the slots.sh maintenance script: a `llama-server`
+header block (the router process itself, port from the server URL) followed
+by one block per loaded model (header with PID/port, RSS/VSZ/VRAM, one line
+per slot) and `free` + `nvidia-smi` output. Intended for `watch -n 1
+llama-server-tool status`.
 
 The registry (`/v1/models`) lists every loadable model; only entries with
 `status.value == "loaded"` have a subprocess and are shown. The subprocess
@@ -19,11 +20,12 @@ port comes from `status.args` (`--port`), and the PID is found by scanning
 
 import subprocess
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel
 
 from .models import get_models
-from .server import ApiError, ServerError
+from .server import ApiError, ServerError, resolve_server_url
 from .slots import Slot, SlotNextToken, get_slots
 
 RULE = "=" * 65
@@ -167,9 +169,10 @@ class StatusBlock(BaseModel):
 
 
 class StatusReport(BaseModel):
-    """The full status board: one block per loaded model plus the system footer."""
+    """The full status board: server header, one block per loaded model, plus the system footer."""
 
     blocks: list[StatusBlock] = []
+    server: StatusBlock | None = None
     error: ApiError | None = None
     system: str | None = None
 
@@ -177,26 +180,45 @@ class StatusReport(BaseModel):
         """Format the board for output."""
         if self.error is not None:
             return f"status: {self.error.message}"
-        body = "status: no loaded models" if not self.blocks else "\n\n".join(block.render() for block in self.blocks)
+        parts = []
+        if self.server is not None:
+            parts.append(self.server.render())
+        if self.blocks:
+            parts.extend(block.render() for block in self.blocks)
+        else:
+            parts.append("status: no loaded models")
+        body = "\n\n".join(parts)
         if self.system:
             body += f"\n\n{self.system}"
         return body
 
 
 def get_status(server: str | None = None, model: str | None = None, include_system: bool = True) -> StatusReport:
-    """Build the status board: one block per loaded model, plus the system footer."""
+    """Build the status board: server header, one block per loaded model, plus the system footer."""
     registry = get_models(server)
     if registry.error is not None:
         return StatusReport(error=registry.error)
     loaded = [info for info in registry.data if info.status is not None and info.status.value == "loaded"]
     if model is not None:
         loaded = [info for info in loaded if info.id == model]
-    ports: set[int] = set()
+    # the router's own port is the server URL's port (8080 when the URL omits one)
+    router_port = urlsplit(resolve_server_url(server)).port or 8080
+    ports: set[int] = {router_port}
     for info in loaded:
         if info.status is not None and info.status.port is not None:
             ports.add(info.status.port)
     pids = find_pids_by_ports(ports)
     vram = nvidia_vram_by_pid() if pids else {}
+    server_pid = pids.get(router_port)
+    server_mem = read_proc_mem(server_pid) if server_pid is not None else None
+    server_block = StatusBlock(
+        model="llama-server",
+        port=router_port,
+        pid=server_pid,
+        rss_gb=server_mem[0] if server_mem is not None else None,
+        vsz_gb=server_mem[1] if server_mem is not None else None,
+        vram_gb=vram.get(server_pid) if server_pid is not None else None,
+    )
     blocks: list[StatusBlock] = []
     for info in loaded:
         status = info.status
@@ -224,4 +246,4 @@ def get_status(server: str | None = None, model: str | None = None, include_syst
                 block.slots = slots_report.slots
         blocks.append(block)
     system = system_footer() if include_system else ""
-    return StatusReport(blocks=blocks, system=system or None)
+    return StatusReport(server=server_block, blocks=blocks, system=system or None)

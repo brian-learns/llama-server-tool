@@ -142,13 +142,22 @@ answers 400).
 
 ### status — board of loaded models
 
-Per loaded model: PID/port (port from the registry's `status.args`, PID via
-a `/proc` cmdline scan — works across accounts), RSS/VSZ/VRAM, and one line
-per slot. Ends with a `free -h` + `nvidia-smi` footer (`--no-system` omits
-it). Made for `watch -n 1 llama-server-tool status`.
+Opens with the router process itself (`llama-server` header; port from the
+server URL, PID via a `/proc` cmdline scan — works across accounts), then
+per loaded model: PID/port (port from the registry's `status.args`),
+RSS/VSZ/VRAM, and one line per slot. Ends with a `free -h` + `nvidia-smi`
+footer (`--no-system` omits it). Made for `watch -n 1 llama-server-tool
+status`.
 
 ```
 $ llama-server-tool status
+=================================================================
+llama-server (PID: 404576 | Port: 9931)
+ -> Unified System RAM (RSS): 0.39 GB
+ -> Virtual Memory Footprint: 15.36 GB
+ -> Dedicated Blackwell VRAM: 0.17 GB
+=================================================================
+
 =================================================================
 Qwen3.8-27B (PID: 342265 | Port: 48249)
  -> Unified System RAM (RSS): 21.71 GB

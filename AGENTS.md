@@ -19,8 +19,9 @@ root:
 - `metrics` — `GET /metrics` (Prometheus exposition text, parsed via
   `prometheus_client`) → `get_metrics()`
 - `slots` — `GET /slots` (JSON array of slot objects) → `get_slots()`
-- `status` — composite board (registry `status.args` port + `/proc` scan +
-  per-model `GET /slots` + `free`/`nvidia-smi` footer) → `get_status()`
+- `status` — composite board (server header from the URL port + `/proc`
+  scan, per-model registry `status.args` port + `GET /slots`,
+  `free`/`nvidia-smi` footer) → `get_status()`
 
 Every API function has an async twin (`aget_health()`, `aget_models()`,
 `aget_props()`, `aget_metrics()`, `aget_slots()`) for asyncio consumers.
