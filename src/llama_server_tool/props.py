@@ -99,7 +99,7 @@ By default, it is read-only. To make POST request to change global properties, y
 
 from typing import Any
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, Field
 
 from .server import ApiError, ServerError, fetch_json, format_value, resolve_server_url
 
@@ -153,7 +153,7 @@ class Props(BaseModel):
     total_slots: int | None = None
     model_path: str | None = None
     # Captured for validation only; render() never emits its content (raw Jinja).
-    chat_template: str | None = None
+    chat_template: str | None = Field(default=None, repr=False)
     chat_template_caps: dict[str, Any] | None = None
     modalities: dict[str, bool] | None = None
     is_sleeping: bool | None = None
