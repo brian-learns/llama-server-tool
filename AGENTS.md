@@ -18,6 +18,7 @@ root:
 - `props` — `GET /props` → `get_props(model=..., autoload=...)`
 - `metrics` — `GET /metrics` (Prometheus exposition text, parsed via
   `prometheus_client`) → `get_metrics()`
+- `slots` — `GET /slots` (JSON array of slot objects) → `get_slots()`
 
 ## Development commands
 

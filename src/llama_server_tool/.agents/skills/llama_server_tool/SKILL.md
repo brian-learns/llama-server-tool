@@ -98,6 +98,24 @@ metrics:
   server's 501 message).
 - In router mode `--model <id>` is required (otherwise the server answers 400).
 
+### slots — `GET /slots`
+
+Per-slot busy state (which slots are processing, context size, tokens
+decoded).
+
+```
+$ llama-server-tool slots --model Qwen3.8-27B
+slots (Qwen3.8-27B):
+  slot 0:
+    is_processing: true
+    n_ctx:         65536
+    speculative:   false
+    id_task:       135
+    n_decoded:     136
+```
+
+In router mode `--model <id>` is required (otherwise the server answers 400).
+
 ## Exit codes
 
 `0` success; `1` server error, unhealthy state, or unreachable server

@@ -10,6 +10,7 @@ from .metrics import get_metrics
 from .models import get_models
 from .props import get_props
 from .server import ServerError
+from .slots import get_slots
 
 app = typer.Typer()
 
@@ -79,6 +80,22 @@ def metrics(
         result = get_metrics(server, model=model)
     except ServerError as err:
         typer.echo(f"metrics: {err}", err=True)
+        raise typer.Exit(code=1) from err
+    typer.echo(result.render())
+    if result.error is not None:
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def slots(
+    server: str | None = typer.Option(None, help="Base URL of the llama-server."),
+    model: str | None = typer.Option(None, help="Model id to query (required in router mode)."),
+) -> None:
+    """Show slot state via GET /slots?model=<id> [--model ID]."""
+    try:
+        result = get_slots(server, model=model)
+    except ServerError as err:
+        typer.echo(f"slots: {err}", err=True)
         raise typer.Exit(code=1) from err
     typer.echo(result.render())
     if result.error is not None:

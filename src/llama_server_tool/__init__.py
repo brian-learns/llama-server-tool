@@ -13,6 +13,7 @@ from .metrics import MetricsReport, get_metrics
 from .models import ModelList, get_models
 from .props import Props, get_props
 from .server import ApiError, ServerError
+from .slots import Slot, SlotsReport, get_slots
 
 __all__ = [
     "ApiError",
@@ -21,8 +22,11 @@ __all__ = [
     "ModelList",
     "Props",
     "ServerError",
+    "Slot",
+    "SlotsReport",
     "check_health",
     "get_metrics",
     "get_models",
     "get_props",
+    "get_slots",
 ]

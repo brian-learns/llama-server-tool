@@ -11,6 +11,7 @@ Each command wraps one server endpoint and prints a formatted report:
 | `models` | `GET /v1/models` | the registered models and their metadata |
 | `props` | `GET /props` | server properties and default generation settings |
 | `metrics` | `GET /metrics` | Prometheus metrics (throughput, token totals, busy slots) |
+| `slots` | `GET /slots` | per-slot busy state (processing, context, tokens decoded) |
 
 ## Server URL
 
