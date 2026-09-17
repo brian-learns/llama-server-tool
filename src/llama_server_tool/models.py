@@ -88,6 +88,32 @@ class ModelMeta(BaseModel):
         return "\n".join(f"    {label:<13}{value}" for label, value in lines)
 
 
+def _arg_value(args: list[str], flag: str) -> str | None:
+    """Return the value following flag in a CLI-style args list, or None."""
+    for i, arg in enumerate(args):
+        if arg == flag and i + 1 < len(args):
+            return args[i + 1]
+    return None
+
+
+class ModelStatus(BaseModel):
+    """Router-mode registry status: load state plus the subprocess launch args."""
+
+    value: str | None = None
+    args: list[str] = []
+
+    @property
+    def port(self) -> int | None:
+        """The subprocess --port argument, if present."""
+        raw = _arg_value(self.args, "--port")
+        return int(raw) if raw is not None and raw.isdigit() else None
+
+    @property
+    def host(self) -> str | None:
+        """The subprocess --host argument, if present."""
+        return _arg_value(self.args, "--host")
+
+
 class ModelInfo(BaseModel):
     """A single model entry from /v1/models."""
 
@@ -96,6 +122,7 @@ class ModelInfo(BaseModel):
     created: int
     owned_by: str
     meta: ModelMeta | None = None
+    status: ModelStatus | None = None
 
     def render(self) -> str:
         """Format the model info lines for output."""

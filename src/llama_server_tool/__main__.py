@@ -13,6 +13,7 @@ from .models import get_models
 from .props import get_props
 from .server import ServerError
 from .slots import get_slots
+from .status import get_status
 
 app = typer.Typer()
 
@@ -173,6 +174,26 @@ def slots(
         raise typer.Exit(code=1) from err
     typer.echo(result.render())
     if result.error is not None:
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def status(
+    model: str | None = typer.Argument(None, help="Model id to show (exact match, must be loaded)."),
+    server: str | None = typer.Option(None, help="Base URL of the llama-server."),
+    no_system: bool = typer.Option(False, "--no-system", help="Omit the free/nvidia-smi footer."),
+) -> None:
+    """Show a watch-friendly board: per-model memory and slot state."""
+    try:
+        report = get_status(server, model=model, include_system=not no_system)
+    except ServerError as err:
+        typer.echo(f"status: {err}", err=True)
+        raise typer.Exit(code=1) from err
+    if model is not None and report.error is None and not report.blocks:
+        typer.echo(f"status: no loaded model with id '{model}'", err=True)
+        raise typer.Exit(code=1)
+    typer.echo(report.render())
+    if report.error is not None:
         raise typer.Exit(code=1)
 
 

@@ -122,6 +122,12 @@ def test_slot_all_optional_absent():
     assert Slot().render() == "  slot None:"
 
 
+def test_slot_parses_n_prompt_tokens():
+    slot = Slot.model_validate({"id": 3, "is_processing": True, "n_ctx": 262144, "n_prompt_tokens": 4433})
+    assert slot.n_prompt_tokens == 4433
+    assert Slot.model_validate({"id": 0, "is_processing": False}).n_prompt_tokens is None
+
+
 def test_slot_params_parsed_not_rendered():
     slot = Slot.model_validate(SAMPLE_BODY[0])
     assert slot.params is not None

@@ -172,6 +172,8 @@ class Slot(BaseModel):
     n_ctx: int | None = None
     speculative: bool | None = None
     is_processing: bool | None = None
+    # Prompt tokens of the current/recent task; absent on never-busy slots.
+    n_prompt_tokens: int | None = None
     params: GenerationParams | None = None
     # A list (one entry per in-flight sequence) on some builds; a dict otherwise.
     next_token: SlotNextToken | list[SlotNextToken] | None = None

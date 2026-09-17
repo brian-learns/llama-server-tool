@@ -140,6 +140,28 @@ slots (Qwen3.8-27B):
 In router mode the positional `MODEL` is required (otherwise the server
 answers 400).
 
+### status — board of loaded models
+
+Per loaded model: PID/port (port from the registry's `status.args`, PID via
+a `/proc` cmdline scan — works across accounts), RSS/VSZ/VRAM, and one line
+per slot. Ends with a `free -h` + `nvidia-smi` footer (`--no-system` omits
+it). Made for `watch -n 1 llama-server-tool status`.
+
+```
+$ llama-server-tool status
+=================================================================
+Qwen3.8-27B (PID: 342265 | Port: 48249)
+ -> Unified System RAM (RSS): 21.71 GB
+ -> Virtual Memory Footprint: 139.87 GB
+ -> Dedicated Blackwell VRAM: 37.65 GB
+ -> Slot [0]: Status = IDLE | Context Ingested = 0 tokens | Active Gen Tokens = 0 | n_ctx = 262144
+ -> Slot [3]: Status = PROCESSING | Context Ingested = 4433 tokens | Active Gen Tokens = 0 | n_ctx = 262144
+=================================================================
+```
+
+Only `loaded` models appear (the registry lists every loadable one; use
+`models` for that). `status MODEL` focuses on one.
+
 ## Exit codes
 
 `0` success; `1` server error, unhealthy state, or unreachable server

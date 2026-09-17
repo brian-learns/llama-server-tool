@@ -19,6 +19,8 @@ root:
 - `metrics` — `GET /metrics` (Prometheus exposition text, parsed via
   `prometheus_client`) → `get_metrics()`
 - `slots` — `GET /slots` (JSON array of slot objects) → `get_slots()`
+- `status` — composite board (registry `status.args` port + `/proc` scan +
+  per-model `GET /slots` + `free`/`nvidia-smi` footer) → `get_status()`
 
 Every API function has an async twin (`aget_health()`, `aget_models()`,
 `aget_props()`, `aget_metrics()`, `aget_slots()`) for asyncio consumers.
@@ -67,6 +69,11 @@ in the wheel); this file covers *developing* it.
   private `_x_from()` helper; the sync function and its `aget_*` twin are thin
   wrappers over `fetch*`/`afetch*` that share that helper — keep them in lockstep
   (a parity test in `tests/test_async_api.py` guards this).
+- **Composite commands**: `status` is not an endpoint — it lives in its own
+  module composing the endpoint APIs (`get_models` + `get_slots`) plus OS
+  collectors. The collectors take `proc_root`/`timeout` parameters so tests
+  never touch the real host; `/proc` (Linux) and `nvidia-smi` (GPU) are
+  optional and must degrade silently (empty output, no crash).
 - **Raw output**: `--json` (health/models/props/slots; not metrics) prints
   the body verbatim. The API exposes it as `raw=True` on `get_*`/`aget_*`,
   returning `(status, body)` — typed with `@overload` (`raw: Literal[True]`
@@ -113,9 +120,10 @@ in the wheel); this file covers *developing* it.
 - `models` output: the user has filter ideas for the large registry list
   (~47 models) — that feedback is the next phase; `slots` `params` rendering
   will likely get the same treatment.
-- Router-mode subprocess ports are not exposed by the API (checked `/props`,
-  `/slots`, `/v1/models` on build b10988) — use `ss -tlnp | grep llama` at
-  the OS level if asked again.
+- Router-mode subprocess ports *are* exposed by `/v1/models`: each registry
+  entry has `status.args` (the subprocess launch argv — `--port`/`--host`
+  are in there) and `status.value` (`loaded`/`unloaded`). `ModelStatus`
+  parses it; the `status` command uses it for port + PID discovery.
 - `/props` on the dev build has extra fields the model deliberately ignores
   (`model_ftype`, `bos/eos_token`, `endpoint_*` booleans, `ui*`,
   `cors_proxy_enabled`) — candidates if props output is ever extended.

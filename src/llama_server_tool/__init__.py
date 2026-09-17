@@ -10,20 +10,24 @@ transport and parse failures raise `ServerError`.
 
 from .health import Health, aget_health, check_health
 from .metrics import MetricsReport, aget_metrics, get_metrics
-from .models import ModelList, aget_models, get_models
+from .models import ModelList, ModelStatus, aget_models, get_models
 from .props import Props, aget_props, get_props
 from .server import ApiError, ServerError
 from .slots import Slot, SlotsReport, aget_slots, get_slots
+from .status import StatusBlock, StatusReport, get_status
 
 __all__ = [
     "ApiError",
     "Health",
     "MetricsReport",
     "ModelList",
+    "ModelStatus",
     "Props",
     "ServerError",
     "Slot",
     "SlotsReport",
+    "StatusBlock",
+    "StatusReport",
     "aget_health",
     "aget_metrics",
     "aget_models",
@@ -34,4 +38,5 @@ __all__ = [
     "get_models",
     "get_props",
     "get_slots",
+    "get_status",
 ]
