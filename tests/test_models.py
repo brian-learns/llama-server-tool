@@ -136,6 +136,30 @@ def test_models_cli_loaded_empty(monkeypatch):
     assert result.output == ""
 
 
+def test_models_cli_reload(monkeypatch):
+    fake = FakeGet(response=json_response(SAMPLE_BODY))
+    result = run_models(monkeypatch, fake, "--reload")
+    assert result.exit_code == 0
+    assert fake.params == {"reload": "1"}
+    assert result.output == f'"{LONG_ID}"\n"{VISION_ID}"\n'
+
+
+def test_models_cli_reload_with_filters(monkeypatch):
+    fake = FakeGet(response=json_response(SAMPLE_BODY))
+    result = run_models(monkeypatch, fake, "--reload", "--loaded")
+    assert result.exit_code == 0
+    assert fake.params == {"reload": "1"}
+    assert result.output == f'"{LONG_ID}"\n'
+
+
+def test_models_cli_json_reload(monkeypatch):
+    fake = FakeGet(response=json_response(SAMPLE_BODY))
+    result = run_models(monkeypatch, fake, "--json", "--reload")
+    assert result.exit_code == 0
+    assert fake.params == {"reload": "1"}
+    assert json.loads(result.output)["object"] == "list"
+
+
 def test_models_cli_input_modalities(monkeypatch):
     fake = FakeGet(response=json_response(SAMPLE_BODY))
     result = run_models(monkeypatch, fake, "--input_modalities", "text,image")

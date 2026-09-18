@@ -14,8 +14,9 @@ llama-server. One command per endpoint, same logic importable from the package
 root:
 
 - `health` — `GET /health` → `check_health()`
-- `models` — `GET /v1/models` (quoted-id list; `--loaded`/modality
-  filters, `--show-modalities`/`--show-meta` table) → `get_models()`
+- `models` — `GET /v1/models` (quoted-id list; `--reload` refresh,
+  `--loaded`/modality filters, `--show-modalities`/`--show-meta` table)
+  → `get_models()`
 - `props` — `GET /props` → `get_props(model=..., autoload=...)`
 - `metrics` — `GET /metrics` (Prometheus exposition text, parsed via
   `prometheus_client`) → `get_metrics()`
@@ -139,6 +140,10 @@ in the wheel); this file covers *developing* it.
 
 ## Gotchas
 
+- `models --reload` (`GET /v1/models?reload=1`) is the one **mutating**
+  endpoint: the server re-scans its models dir, unloads running models whose
+  source was updated or removed, and never loads anything. Tests never call
+  it live (FakeGet records `params`); a live call is a server-state change.
 - `uv` >= 0.12 is required (checked by `make checkdeps`); the audit and
   malware-check flags are preview features.
 - Venvs (`.venv`, `.venv-*`) and tool caches are gitignored — never commit

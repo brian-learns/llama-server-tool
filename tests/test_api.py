@@ -67,6 +67,14 @@ def test_get_models(monkeypatch):
     assert result.data[0].id == "../models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
 
 
+def test_get_models_reload(monkeypatch):
+    fake = with_fake(monkeypatch, FakeGet(response=json_response(MODELS_BODY)))
+    get_models()
+    assert fake.params is None
+    get_models(reload=True)
+    assert fake.params == {"reload": "1"}
+
+
 def test_get_props_builds_params(monkeypatch):
     fake = with_fake(monkeypatch, FakeGet(response=json_response(PROPS_BODY)))
     get_props(model="x")

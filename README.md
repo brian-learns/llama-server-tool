@@ -8,7 +8,7 @@ Each command wraps one server endpoint and prints a formatted report:
 | Command | Endpoint | Shows |
 | ------- | -------- | ----- |
 | `health` | `GET /health` | whether the model is loaded and the server is ready |
-| `models` | `GET /v1/models` | the model registry as quoted ids; filters (`--loaded`, `--input_modalities`, `--output_modalities`) and table columns (`--show-modalities`, `--show-meta`) |
+| `models` | `GET /v1/models` | the model registry as quoted ids; `--reload` refreshes it from the models dir (mutating); filters (`--loaded`, `--input_modalities`, `--output_modalities`) and table columns (`--show-modalities`, `--show-meta`) |
 | `props` | `GET /props` | server properties and default generation settings |
 | `metrics` | `GET /metrics` | Prometheus metrics (throughput, token totals, busy slots) |
 | `slots` | `GET /slots` | per-slot busy state (processing, context, tokens decoded) |
@@ -27,6 +27,9 @@ filters are display-only, so `--json` cannot be combined with them. Note
 
 `models` prints one quoted id per line by default; `--show-modalities`
 and `--show-meta` (with `--meta-fields`) switch it to an aligned table.
+`models --reload` refreshes the registry from the server's models dir
+without a restart — the one mutating endpoint: loaded models whose source
+was updated or removed are unloaded, and nothing is loaded.
 
 `status` is a watch-friendly board of the models that are actually loaded
 (make it a poor man's top with `watch -n 1 llama-server-tool status`); it

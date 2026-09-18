@@ -69,6 +69,13 @@ def _filter_models_json(body: str, model: str) -> tuple[str, bool]:
 def models(
     model: str | None = typer.Argument(None, help="Model id to show (exact match)."),
     server: str | None = typer.Option(None, help="Base URL of the llama-server."),
+    reload: bool = typer.Option(
+        False,
+        help=(
+            "Refresh the model list from the models dir first (?reload=1). Loaded models whose source was updated "
+            "or removed are UNLOADED; nothing is loaded. The refreshed list is printed."
+        ),
+    ),
     loaded: bool = typer.Option(False, help="Only show loaded models."),
     # B008: typer materializes the list default itself; None is the safe default
     # explicit --input_modalities names: typer would otherwise dash-ify the parameter name
@@ -89,7 +96,8 @@ def models(
 ) -> None:
     """Show the model registry as quoted ids via GET /v1/models [MODEL].
 
-    Filters: --loaded, --input_modalities, --output_modalities.
+    --reload refreshes the list from the models dir first (mutating: see
+    --help). Filters: --loaded, --input_modalities, --output_modalities.
     Table columns: --show-modalities, --show-meta (with --meta-fields)."""
     # typer list options do not split commas; accept both `--opt a,b` and repeated flags
     meta_fields_given = meta_fields is not None
@@ -113,7 +121,7 @@ def models(
             typer.echo(f"models: --json cannot be combined with {', '.join(conflicting)}", err=True)
             raise typer.Exit(code=1)
         try:
-            status, body = get_models(server, raw=True)
+            status, body = get_models(server, raw=True, reload=reload)
         except ServerError as err:
             typer.echo(f"models: {err}", err=True)
             raise typer.Exit(code=1) from err
@@ -131,7 +139,7 @@ def models(
     show_meta = show_meta or meta_fields_given
     loaded = loaded or show_meta
     try:
-        result = get_models(server)
+        result = get_models(server, reload=reload)
     except ServerError as err:
         typer.echo(f"models: {err}", err=True)
         raise typer.Exit(code=1) from err

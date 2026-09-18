@@ -217,36 +217,44 @@ def _models_from(body: dict[str, Any]) -> ModelList:
 
 
 @overload
-def get_models(server: str | None = None, *, raw: Literal[True]) -> tuple[int, str]:
+def get_models(server: str | None = None, *, raw: Literal[True], reload: bool = False) -> tuple[int, str]:
     """Raw variant: return (status, body) without validation."""
 
 
 @overload
-def get_models(server: str | None = None, raw: bool = False) -> ModelList:
+def get_models(server: str | None = None, raw: bool = False, reload: bool = False) -> ModelList:
     """Return the validated model (default)."""
 
 
-def get_models(server: str | None = None, raw: bool = False) -> "ModelList | tuple[int, str]":
-    """Query GET /v1/models; returns the validated ModelList, or (status, body) with raw=True."""
+def get_models(server: str | None = None, raw: bool = False, reload: bool = False) -> "ModelList | tuple[int, str]":
+    """Query GET /v1/models; returns the validated ModelList, or (status, body) with raw=True.
+
+    reload=True sends ?reload=1: the server refreshes the model list from the
+    models dir first (a loaded model whose source was updated or removed is
+    unloaded; nothing is loaded)."""
+    params = {"reload": "1"} if reload else None
     if raw:
-        return fetch(resolve_server_url(server), "/v1/models")
-    _, body = fetch_json(resolve_server_url(server), "/v1/models")
+        return fetch(resolve_server_url(server), "/v1/models", params=params)
+    _, body = fetch_json(resolve_server_url(server), "/v1/models", params=params)
     return _models_from(body)
 
 
 @overload
-async def aget_models(server: str | None = None, *, raw: Literal[True]) -> tuple[int, str]:
+async def aget_models(server: str | None = None, *, raw: Literal[True], reload: bool = False) -> tuple[int, str]:
     """Raw variant: return (status, body) without validation."""
 
 
 @overload
-async def aget_models(server: str | None = None, raw: bool = False) -> ModelList:
+async def aget_models(server: str | None = None, raw: bool = False, reload: bool = False) -> ModelList:
     """Return the validated model (default)."""
 
 
-async def aget_models(server: str | None = None, raw: bool = False) -> "ModelList | tuple[int, str]":
+async def aget_models(
+    server: str | None = None, raw: bool = False, reload: bool = False
+) -> "ModelList | tuple[int, str]":
     """Async version of get_models()."""
+    params = {"reload": "1"} if reload else None
     if raw:
-        return await afetch(resolve_server_url(server), "/v1/models")
-    _, body = await afetch_json(resolve_server_url(server), "/v1/models")
+        return await afetch(resolve_server_url(server), "/v1/models", params=params)
+    _, body = await afetch_json(resolve_server_url(server), "/v1/models", params=params)
     return _models_from(body)

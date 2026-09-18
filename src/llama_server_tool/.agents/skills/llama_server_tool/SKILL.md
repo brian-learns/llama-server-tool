@@ -58,15 +58,19 @@ server is unreachable.
 
 ### models — `GET /v1/models`
 
-The registry as quoted ids, one per line (pipe-friendly). Filters:
-`--loaded`, `--input_modalities` / `--output_modalities` (repeatable or
-comma-separated; a model must support **all** requested). Table columns:
-`--show-modalities` (input/output), `--show-meta` (implies `--loaded`;
-default columns `n_params n_ctx_train n_embd n_vocab size vocab_type`),
-`--meta-fields f1,f2` (implies `--show-meta`; unknown field → error). The
-positional `MODEL` filters client-side to the exact id (no match → exit 1).
-Empty filter results print nothing and exit 0. `--json` is mutually
-exclusive with the filters.
+The registry as quoted ids, one per line (pipe-friendly). `--reload`
+refreshes the registry from the server's models dir first (replaces a
+server restart after downloading models) — the one mutating endpoint:
+loaded models whose source was updated or removed are unloaded, and
+nothing is loaded. Filters: `--loaded`, `--input_modalities` /
+`--output_modalities` (repeatable or comma-separated; a model must support
+**all** requested). Table columns: `--show-modalities` (input/output),
+`--show-meta` (implies `--loaded`; default columns `n_params n_ctx_train
+n_embd n_vocab size vocab_type`), `--meta-fields f1,f2` (implies
+`--show-meta`; unknown field → error). The positional `MODEL` filters
+client-side to the exact id (no match → exit 1). Empty filter results
+print nothing and exit 0. `--json` is mutually exclusive with the filters
+(but works with `--reload`).
 
 ```
 $ llama-server-tool models --loaded

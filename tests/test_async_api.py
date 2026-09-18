@@ -75,6 +75,12 @@ def test_aget_models(monkeypatch):
     assert result.data[0].id == "../models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
 
 
+def test_aget_models_reload(monkeypatch):
+    fake = async_client(monkeypatch, response=json_response(MODELS_BODY))
+    run(aget_models(reload=True))
+    assert fake.calls[-1] == ("http://127.0.0.0:8080/v1/models", {"reload": "1"})
+
+
 def test_aget_props_params(monkeypatch):
     fake = async_client(monkeypatch, response=json_response(PROPS_BODY))
     run(aget_props(model="x"))
