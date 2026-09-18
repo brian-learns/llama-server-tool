@@ -16,13 +16,16 @@ from llama_server_tool import (
     aget_models,
     aget_props,
     aget_slots,
+    aunload_model,
     check_health,
     get_metrics,
     get_models,
     get_props,
     get_slots,
+    unload_model,
 )
 from llama_server_tool.server import ServerError
+from llama_server_tool.slots import Slot, SlotsReport
 from test_metrics import SAMPLE_TEXT
 from test_models import SAMPLE_BODY as MODELS_BODY
 from test_props import SAMPLE_BODY as PROPS_BODY
@@ -149,6 +152,35 @@ def test_aget_slots_non_list(monkeypatch):
         run(aget_slots())
 
 
+def test_aunload_model(monkeypatch):
+    """Success path: the slots check is stubbed out, only the POST goes to the fake client."""
+    import llama_server_tool.unload as unload_module
+
+    async def fake_aget_slots(*args, **kwargs):
+        return SlotsReport(slots=[])
+
+    monkeypatch.setattr(unload_module, "aget_slots", fake_aget_slots)
+    fake = async_client(monkeypatch, response=json_response({"success": True}))
+    result = run(aunload_model("m"))
+    assert result.success is True
+    assert fake.calls == [("http://127.0.0.0:8080/models/unload", {"model": "m"})]
+
+
+def test_aunload_model_refuses_when_busy(monkeypatch):
+    import llama_server_tool.unload as unload_module
+
+    busy = [Slot(id=0, is_processing=False), Slot(id=1, is_processing=True)]
+
+    async def fake_aget_slots(*args, **kwargs):
+        return SlotsReport(slots=busy)
+
+    monkeypatch.setattr(unload_module, "aget_slots", fake_aget_slots)
+    fake = async_client(monkeypatch, response=json_response({"success": True}))
+    result = run(aunload_model("m"))
+    assert result.busy_slots == 1
+    assert fake.calls == []  # refused before the POST
+
+
 def test_async_sync_parity(monkeypatch):
     """Given the same canned bodies, async and sync return equal models."""
     monkeypatch.setattr(httpx, "get", FakeGet(response=json_response({"status": "ok"})))
@@ -170,6 +202,21 @@ def test_async_sync_parity(monkeypatch):
     monkeypatch.setattr(httpx, "get", FakeGet(response=json_response(SLOTS_BODY)))
     async_client(monkeypatch, response=json_response(SLOTS_BODY))
     assert run(aget_slots()) == get_slots()
+
+    # unload: both paths see the 400 slots check (not running) and the 400 POST error body
+    import llama_server_tool.unload as unload_module
+
+    not_loaded = {"error": {"code": 400, "message": "model is not loaded", "type": "invalid_request_error"}}
+    not_running = {"error": {"code": 400, "message": "model is not running", "type": "invalid_request_error"}}
+
+    async def fake_aget_slots(*args, **kwargs):
+        return SlotsReport.model_validate(not_loaded)
+
+    monkeypatch.setattr(httpx, "get", FakeGet(response=json_response(not_loaded, status_code=400)))
+    monkeypatch.setattr(httpx, "post", FakeGet(response=json_response(not_running, status_code=400)))
+    monkeypatch.setattr(unload_module, "aget_slots", fake_aget_slots)
+    async_client(monkeypatch, response=json_response(not_running, status_code=400))
+    assert run(aunload_model("m")) == unload_model("m")
 
 
 def test_model_dump_json_for_tracing(monkeypatch):

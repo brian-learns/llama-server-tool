@@ -20,13 +20,17 @@ root:
 - `props` — `GET /props` → `get_props(model=..., autoload=...)`
 - `metrics` — `GET /metrics` (Prometheus exposition text, parsed via
   `prometheus_client`) → `get_metrics()`
-- `slots` — `GET /slots` (JSON array of slot objects) → `get_slots()`
+- `slots` — `GET /slots` (JSON array of slot objects) →
+  `get_slots(model=..., autoload=...)`
+- `unload` — `POST /models/unload` (router mode; busy-slot pre-check with
+  `autoload=false`, `--force` skips it) → `unload_model(model=..., force=...)`
 - `status` — composite board (server header from the URL port + `/proc`
   scan, per-model registry `status.args` port + `GET /slots`,
   `free`/`nvidia-smi` footer) → `get_status()`
 
 Every API function has an async twin (`aget_health()`, `aget_models()`,
-`aget_props()`, `aget_metrics()`, `aget_slots()`) for asyncio consumers.
+`aget_props()`, `aget_metrics()`, `aget_slots()`, `aunload_model()`) for
+asyncio consumers.
 
 ## Development commands
 
@@ -44,7 +48,8 @@ scripts/test-all-versions.sh     test on all supported python versions
 .github/workflows/ci.yml         CI matrix, mirrors the local version list
 docs/NN_*.md                     per-phase planning docs (plan first, code after approval)
 src/llama_server_tool/server.py  shared: URL resolution, fetch/fetch_json,
-                                 ApiError, ServerError, format_value
+                                 post_json/apost_json, ApiError, ServerError,
+                                 format_value
 src/llama_server_tool/<cmd>.py   one file per endpoint: pydantic models + API
                                  function; the module docstring is the endpoint
                                  documentation (from the llama.cpp server README)
@@ -70,8 +75,9 @@ in the wheel); this file covers *developing* it.
   when `.error` is set (or `status != "ok"` for health).
 - **Async parity**: each endpoint module keeps its response-handling logic in a
   private `_x_from()` helper; the sync function and its `aget_*` twin are thin
-  wrappers over `fetch*`/`afetch*` that share that helper — keep them in lockstep
-  (a parity test in `tests/test_async_api.py` guards this).
+  wrappers over `fetch*`/`afetch*` (or `post_json`/`apost_json` for POSTs,
+  `unload`) that share that helper — keep them in lockstep (a parity test in
+  `tests/test_async_api.py` guards this).
 - **Composite commands**: `status` is not an endpoint — it lives in its own
   module composing the endpoint APIs (`get_models` + `get_slots`) plus OS
   collectors. The collectors take `proc_root`/`timeout` parameters so tests
@@ -100,8 +106,9 @@ in the wheel); this file covers *developing* it.
   *before* field constraints. Plain functions work as validators (pydantic v2);
   they avoid vulture flagging an unused `cls` — but ruff N805 misfires on them
   in class scope, so keep the `# noqa: N805` with a short reason.
-- **Tests**: no live server is ever required — monkeypatch `httpx.get` with
-  `FakeGet` from `tests/helpers.py` (records URLs and query params). CLI via
+- **Tests**: no live server is ever required — monkeypatch `httpx.get` (and
+  `httpx.post` for `unload`) with `FakeGet` from `tests/helpers.py` (records
+  URLs, query params, and the POST json body). CLI via
   `typer.testing.CliRunner` (assert `exit_code` and `output`/`stderr`); models
   and API functions directly; `pytest.raises` for expected `ServerError`s.
 
@@ -137,13 +144,29 @@ in the wheel); this file covers *developing* it.
 - `/props` on the dev build has extra fields the model deliberately ignores
   (`model_ftype`, `bos/eos_token`, `endpoint_*` booleans, `ui*`,
   `cors_proxy_enabled`) — candidates if props output is ever extended.
+- The dev build also has `POST /models/load` (`post_router_models_load`,
+  router mode: 400 "model is already running" if running, loads otherwise) —
+  a `load` command would pair with `unload` (phase 15 deferred it).
 
 ## Gotchas
 
-- `models --reload` (`GET /v1/models?reload=1`) is the one **mutating**
-  endpoint: the server re-scans its models dir, unloads running models whose
-  source was updated or removed, and never loads anything. Tests never call
-  it live (FakeGet records `params`); a live call is a server-state change.
+- `models --reload` (`GET /v1/models?reload=1`) is one of the two
+  **mutating** endpoints: the server re-scans its models dir, unloads
+  running models whose source was updated or removed, and never loads
+  anything. `unload` (`POST /models/unload`) is the other: router mode
+  only, synchronous (the instance is stopped before the response), and it
+  interrupts in-flight generation on the model's slots. Tests never call
+  either live (FakeGet records `params` / the POST json body); a live call
+  is a server-state change.
+- Router proxy routes **auto-load a non-running model by default**
+  (`is_autoload` → server default): `slots MODEL` / `metrics MODEL` on an
+  unloaded model *loads it*. Calls that must stay side-effect-free send
+  `autoload=false` (`props` by default; `unload`'s busy check — that is
+  also why `get_slots` has an `autoload` param). `status` is safe: it only
+  slots-fetches models the registry reports as loaded.
+- Router-mode POST routes (`/completion`, `/v1/chat/completions`, ...) take
+  the model from the **JSON body's `"model"` field**, not a `?model=` query
+  param (`proxy_post`); GET proxy routes use `?model=`.
 - `uv` >= 0.12 is required (checked by `make checkdeps`); the audit and
   malware-check flags are preview features.
 - Venvs (`.venv`, `.venv-*`) and tool caches are gitignored — never commit

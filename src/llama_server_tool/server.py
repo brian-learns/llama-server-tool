@@ -73,6 +73,37 @@ def fetch_json(
         raise ServerError(f"invalid JSON from {path}: {err}") from err
 
 
+def post_json(base: str, path: str, body: dict[str, Any], timeout: float | None = None) -> tuple[int, dict[str, Any]]:
+    """POST a JSON body to an endpoint, returning (status code, parsed body)."""
+    try:
+        response = httpx.post(f"{base}{path}", json=body, timeout=_request_timeout(timeout))
+    except httpx.TimeoutException as err:
+        raise ServerError(f"timed out after {_request_timeout(timeout).read}s") from err
+    except httpx.HTTPError as err:
+        raise ServerError(str(err)) from err
+    try:
+        return response.status_code, json.loads(response.text)
+    except ValueError as err:
+        raise ServerError(f"invalid JSON from {path}: {err}") from err
+
+
+async def apost_json(
+    base: str, path: str, body: dict[str, Any], timeout: float | None = None
+) -> tuple[int, dict[str, Any]]:
+    """Async version of post_json()."""
+    try:
+        async with httpx.AsyncClient(timeout=_request_timeout(timeout)) as client:
+            response = await client.post(f"{base}{path}", json=body)
+    except httpx.TimeoutException as err:
+        raise ServerError(f"timed out after {_request_timeout(timeout).read}s") from err
+    except httpx.HTTPError as err:
+        raise ServerError(str(err)) from err
+    try:
+        return response.status_code, json.loads(response.text)
+    except ValueError as err:
+        raise ServerError(f"invalid JSON from {path}: {err}") from err
+
+
 async def afetch(
     base: str, path: str, params: dict[str, str] | None = None, timeout: float | None = None
 ) -> tuple[int, str]:

@@ -227,21 +227,39 @@ def _slots_from(status: int, text: str, model: str | None) -> SlotsReport:
         raise ServerError(f"failed to parse slots response: {err}") from err
 
 
+def _slots_params(model: str | None, autoload: bool | None) -> dict[str, str] | None:
+    """Build the /slots query params; autoload=None omits the param (server default)."""
+    params: dict[str, str] = {}
+    if model is not None:
+        params["model"] = model
+    if autoload is not None:
+        params["autoload"] = "true" if autoload else "false"
+    return params or None
+
+
 @overload
-def get_slots(server: str | None = None, model: str | None = None, *, raw: Literal[True]) -> tuple[int, str]:
+def get_slots(
+    server: str | None = None, model: str | None = None, autoload: bool | None = None, *, raw: Literal[True]
+) -> tuple[int, str]:
     """Raw variant: return (status, body) without validation."""
 
 
 @overload
-def get_slots(server: str | None = None, model: str | None = None, raw: bool = False) -> SlotsReport:
+def get_slots(
+    server: str | None = None, model: str | None = None, autoload: bool | None = None, raw: bool = False
+) -> SlotsReport:
     """Return the validated model (default)."""
 
 
 def get_slots(
-    server: str | None = None, model: str | None = None, raw: bool = False
+    server: str | None = None, model: str | None = None, autoload: bool | None = None, raw: bool = False
 ) -> "SlotsReport | tuple[int, str]":
-    """Query GET /slots; returns the validated SlotsReport, or (status, body) with raw=True."""
-    params = {"model": model} if model is not None else None
+    """Query GET /slots; returns the validated SlotsReport, or (status, body) with raw=True.
+
+    autoload=None omits the param (the server decides — router proxy routes
+    auto-load a non-running model by default); pass False to make the call
+    side-effect-free (400 'model is not loaded' instead of a load)."""
+    params = _slots_params(model, autoload)
     if raw:
         return fetch(resolve_server_url(server), "/slots", params=params)
     status, text = fetch(resolve_server_url(server), "/slots", params=params)
@@ -249,20 +267,24 @@ def get_slots(
 
 
 @overload
-async def aget_slots(server: str | None = None, model: str | None = None, *, raw: Literal[True]) -> tuple[int, str]:
+async def aget_slots(
+    server: str | None = None, model: str | None = None, autoload: bool | None = None, *, raw: Literal[True]
+) -> tuple[int, str]:
     """Raw variant: return (status, body) without validation."""
 
 
 @overload
-async def aget_slots(server: str | None = None, model: str | None = None, raw: bool = False) -> SlotsReport:
+async def aget_slots(
+    server: str | None = None, model: str | None = None, autoload: bool | None = None, raw: bool = False
+) -> SlotsReport:
     """Return the validated model (default)."""
 
 
 async def aget_slots(
-    server: str | None = None, model: str | None = None, raw: bool = False
+    server: str | None = None, model: str | None = None, autoload: bool | None = None, raw: bool = False
 ) -> "SlotsReport | tuple[int, str]":
     """Async version of get_slots()."""
-    params = {"model": model} if model is not None else None
+    params = _slots_params(model, autoload)
     if raw:
         return await afetch(resolve_server_url(server), "/slots", params=params)
     status, text = await afetch(resolve_server_url(server), "/slots", params=params)

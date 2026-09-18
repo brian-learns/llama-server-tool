@@ -14,6 +14,7 @@ from .props import get_props
 from .server import ServerError
 from .slots import get_slots
 from .status import get_status
+from .unload import unload_model
 
 app = typer.Typer()
 
@@ -241,6 +242,26 @@ def slots(
         raise typer.Exit(code=1) from err
     typer.echo(result.render())
     if result.error is not None:
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def unload(
+    model: str = typer.Argument(..., help="Model id to unload (exact match)."),
+    server: str | None = typer.Option(None, help="Base URL of the llama-server."),
+    force: bool = typer.Option(False, help="Unload even if a slot is actively generating (the check is best-effort)."),
+) -> None:
+    """Unload a model via POST /models/unload (router mode).
+
+    Refuses while a slot is processing unless --force; unloading interrupts
+    in-flight generation and frees the model's memory."""
+    try:
+        result = unload_model(model, server, force=force)
+    except ServerError as err:
+        typer.echo(f"unload: {err}", err=True)
+        raise typer.Exit(code=1) from err
+    typer.echo(result.render())
+    if result.error is not None or result.busy_slots is not None:
         raise typer.Exit(code=1)
 
 

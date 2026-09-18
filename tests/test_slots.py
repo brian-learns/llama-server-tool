@@ -71,6 +71,17 @@ def test_slots_model_param(monkeypatch):
     assert fake.params is None
 
 
+def test_slots_autoload_param(monkeypatch):
+    fake = FakeGet(response=json_response(SAMPLE_BODY))
+    monkeypatch.setattr(httpx, "get", fake)
+    get_slots(model="m")
+    assert fake.params == {"model": "m"}  # autoload omitted: server default
+    get_slots(model="m", autoload=False)
+    assert fake.params == {"model": "m", "autoload": "false"}
+    get_slots(model="m", autoload=True)
+    assert fake.params == {"model": "m", "autoload": "true"}
+
+
 def test_slots_400_missing_model(monkeypatch):
     body = {"error": {"code": 400, "message": "model name is missing from the request", "type": "invalid_request_error"}}
     fake = FakeGet(response=json_response(body, status_code=400))

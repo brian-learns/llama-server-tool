@@ -15,6 +15,7 @@ from .props import Props, aget_props, get_props
 from .server import ApiError, ServerError
 from .slots import Slot, SlotsReport, aget_slots, get_slots
 from .status import StatusBlock, StatusReport, get_status
+from .unload import UnloadReport, aunload_model, unload_model
 
 __all__ = [
     "ApiError",
@@ -28,15 +29,18 @@ __all__ = [
     "SlotsReport",
     "StatusBlock",
     "StatusReport",
+    "UnloadReport",
     "aget_health",
     "aget_metrics",
     "aget_models",
     "aget_props",
     "aget_slots",
+    "aunload_model",
     "check_health",
     "get_metrics",
     "get_models",
     "get_props",
     "get_slots",
     "get_status",
+    "unload_model",
 ]

@@ -12,6 +12,7 @@ Each command wraps one server endpoint and prints a formatted report:
 | `props` | `GET /props` | server properties and default generation settings |
 | `metrics` | `GET /metrics` | Prometheus metrics (throughput, token totals, busy slots) |
 | `slots` | `GET /slots` | per-slot busy state (processing, context, tokens decoded) |
+| `unload` | `POST /models/unload` | unloads a model (router mode); refuses while a slot is processing unless `--force` |
 | `status` | `GET /v1/models` + `GET /slots` + OS | board of loaded models: server header (router memory), per-model memory (RSS/VSZ/VRAM), slot state, and a `free`/`nvidia-smi` footer (omit with `--no-system`) |
 
 Commands that query a specific model take it as a positional argument
@@ -28,8 +29,15 @@ filters are display-only, so `--json` cannot be combined with them. Note
 `models` prints one quoted id per line by default; `--show-modalities`
 and `--show-meta` (with `--meta-fields`) switch it to an aligned table.
 `models --reload` refreshes the registry from the server's models dir
-without a restart — the one mutating endpoint: loaded models whose source
-was updated or removed are unloaded, and nothing is loaded.
+without a restart: loaded models whose source was updated or removed are
+unloaded, and nothing is loaded.
+
+`unload MODEL` is the other mutating command (router mode only): it stops
+the model's instance and frees its memory, interrupting any in-flight
+generation. Unless `--force`, it first checks the model's slots — with
+`autoload=false`, so the check never loads the model — and refuses while
+one is processing (the check is best-effort: a request can start between
+the check and the unload).
 
 `status` is a watch-friendly board of the models that are actually loaded
 (make it a poor man's top with `watch -n 1 llama-server-tool status`); it
@@ -65,13 +73,14 @@ print(props.render())            # or the same report the CLI prints
 ```
 
 Available: `check_health()`, `get_models()`, `get_props(model=...,
-autoload=...)`, `get_metrics(model=...)`, `get_slots(model=...)`, plus the
-models (`Health`, `ModelList`, `Props`, `MetricsReport`, `SlotsReport`) and
-`ApiError` / `ServerError`.
+autoload=...)`, `get_metrics(model=...)`, `get_slots(model=...,
+autoload=...)`, `unload_model(model=..., force=...)`, plus the models
+(`Health`, `ModelList`, `Props`, `MetricsReport`, `SlotsReport`,
+`UnloadReport`) and `ApiError` / `ServerError`.
 
 Every function also has an async twin for asyncio code — `aget_health()`,
-`aget_models()`, `aget_props(...)`, `aget_metrics(...)`, `aget_slots(...)` —
-with identical behavior and return types.
+`aget_models()`, `aget_props(...)`, `aget_metrics(...)`, `aget_slots(...)`,
+`aunload_model(...)` — with identical behavior and return types.
 
 `get_props(model=..., autoload=True)` (and its async twin) holds the request
 until the server has loaded the model, so it uses a 5-minute read timeout in

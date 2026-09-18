@@ -1,6 +1,6 @@
 ---
 name: llama_server_tool
-description: Query and report on a local llama.cpp llama-server — health, models, server properties, Prometheus metrics — via CLI or Python API. Use when asked to check llama-server health, list or inspect models, read server properties or generation settings, or get token/throughput metrics.
+description: Query and administer a local llama.cpp llama-server — health, models, server properties, Prometheus metrics, unloading models — via CLI or Python API. Use when asked to check llama-server health, list or inspect models, read server properties or generation settings, get token/throughput metrics, or unload a model from a router-mode server.
 ---
 
 <!--
@@ -60,9 +60,9 @@ server is unreachable.
 
 The registry as quoted ids, one per line (pipe-friendly). `--reload`
 refreshes the registry from the server's models dir first (replaces a
-server restart after downloading models) — the one mutating endpoint:
-loaded models whose source was updated or removed are unloaded, and
-nothing is loaded. Filters: `--loaded`, `--input_modalities` /
+server restart after downloading models) — a mutating endpoint: loaded
+models whose source was updated or removed are unloaded, and nothing is
+loaded. Filters: `--loaded`, `--input_modalities` /
 `--output_modalities` (repeatable or comma-separated; a model must support
 **all** requested). Table columns: `--show-modalities` (input/output),
 `--show-meta` (implies `--loaded`; default columns `n_params n_ctx_train
@@ -146,6 +146,29 @@ slots (Qwen3.8-27B):
 In router mode the positional `MODEL` is required (otherwise the server
 answers 400).
 
+### unload — `POST /models/unload`
+
+Unloads a model (router mode only): stops its instance, frees its memory,
+and interrupts any in-flight generation. Mutating.
+
+```
+$ llama-server-tool unload MiniCPM5-2B
+unload: MiniCPM5-2B unloaded
+
+$ llama-server-tool unload MiniCPM5-2B
+unload: MiniCPM5-2B is busy (1 slot(s) processing); use --force to unload anyway
+```
+
+- The positional `MODEL` is required (exact id).
+- Unless `--force`, the slots of the model are checked first — with
+  `autoload=false`, so the check never loads the model — and the unload is
+  refused while a slot is processing (exit 1). Idle slots holding a cached
+  context are not busy. The check is best-effort: a request can start
+  between the check and the unload.
+- `--force` skips the check and unloads anyway.
+- Server errors render as `unload: <message>` (e.g. `model is not
+  running`, `model is not found`), exit 1.
+
 ### status — board of loaded models
 
 Opens with the router process itself (`llama-server` header; port from the
@@ -204,14 +227,15 @@ print(props.model_path)  # field access for automation
 print(props.render())  # or the same report the CLI prints
 ```
 
-`get_props(model=..., autoload=...)`, `get_metrics(model=...)` and
-`get_slots(model=...)` mirror the CLI options; the models are `Health`,
-`ModelList`, `Props`, `MetricsReport`, `SlotsReport`, with `ApiError` /
+`get_props(model=..., autoload=...)`, `get_metrics(model=...)`,
+`get_slots(model=..., autoload=...)` and `unload_model(model=...,
+force=...)` mirror the CLI options; the models are `Health`, `ModelList`,
+`Props`, `MetricsReport`, `SlotsReport`, `UnloadReport`, with `ApiError` /
 `ServerError` for error types. The package is typed (`py.typed`).
 
 Every function has an async twin for asyncio code (`aget_health()`,
-`aget_models()`, `aget_props(...)`, `aget_metrics()`, `aget_slots(...)`) with
-identical behavior and return types:
+`aget_models()`, `aget_props(...)`, `aget_metrics()`, `aget_slots(...)`,
+`aunload_model(...)`) with identical behavior and return types:
 
 ```python
 props = await llama_server_tool.aget_props(model="Qwen3.8-27B")

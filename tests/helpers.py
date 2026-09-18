@@ -15,11 +15,13 @@ class FakeGet:
         self.urls = []
         self.params = None
         self.timeout = None
+        self.json_body = None
 
-    def __call__(self, url, timeout=None, params=None):
+    def __call__(self, url, timeout=None, params=None, json=None):
         self.urls.append(url)
         self.params = params
         self.timeout = timeout
+        self.json_body = json
         if self.error is not None:
             raise self.error
         return self.response
@@ -53,6 +55,13 @@ class FakeAsyncClient:
 
     async def get(self, url, timeout=None, params=None):
         self.calls.append((url, params))
+        self.timeout = timeout
+        if self.error is not None:
+            raise self.error
+        return self.response
+
+    async def post(self, url, json=None, timeout=None):
+        self.calls.append((url, json))
         self.timeout = timeout
         if self.error is not None:
             raise self.error
