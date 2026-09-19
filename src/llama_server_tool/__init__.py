@@ -9,6 +9,7 @@ transport and parse failures raise `ServerError`.
 """
 
 from .health import Health, aget_health, check_health
+from .load import LoadReport, aload_model, load_model
 from .metrics import MetricsReport, aget_metrics, get_metrics
 from .models import ModelList, ModelStatus, aget_models, get_models
 from .props import Props, aget_props, get_props
@@ -20,6 +21,7 @@ from .unload import UnloadReport, aunload_model, unload_model
 __all__ = [
     "ApiError",
     "Health",
+    "LoadReport",
     "MetricsReport",
     "ModelList",
     "ModelStatus",
@@ -35,6 +37,7 @@ __all__ = [
     "aget_models",
     "aget_props",
     "aget_slots",
+    "aload_model",
     "aunload_model",
     "check_health",
     "get_metrics",
@@ -42,5 +45,6 @@ __all__ = [
     "get_props",
     "get_slots",
     "get_status",
+    "load_model",
     "unload_model",
 ]

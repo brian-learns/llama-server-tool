@@ -152,7 +152,7 @@ from typing import Literal, overload
 from pydantic import BaseModel, ValidationError
 
 from .props import GenerationParams
-from .server import ApiError, ServerError, afetch, fetch, format_value, resolve_server_url
+from .server import AUTOLOAD_TIMEOUT, ApiError, ServerError, afetch, fetch, format_value, resolve_server_url
 
 
 class SlotNextToken(BaseModel):
@@ -237,6 +237,11 @@ def _slots_params(model: str | None, autoload: bool | None) -> dict[str, str] | 
     return params or None
 
 
+def _slots_timeout(autoload: bool | None) -> float | None:
+    """Read timeout for a /slots request; an explicit autoload holds until the model loads."""
+    return AUTOLOAD_TIMEOUT if autoload else None
+
+
 @overload
 def get_slots(
     server: str | None = None, model: str | None = None, autoload: bool | None = None, *, raw: Literal[True]
@@ -258,11 +263,13 @@ def get_slots(
 
     autoload=None omits the param (the server decides — router proxy routes
     auto-load a non-running model by default); pass False to make the call
-    side-effect-free (400 'model is not loaded' instead of a load)."""
+    side-effect-free (400 'model is not loaded' instead of a load). An
+    explicit True may hold the response until the model loads (300 s read)."""
     params = _slots_params(model, autoload)
+    timeout = _slots_timeout(autoload)
     if raw:
-        return fetch(resolve_server_url(server), "/slots", params=params)
-    status, text = fetch(resolve_server_url(server), "/slots", params=params)
+        return fetch(resolve_server_url(server), "/slots", params=params, timeout=timeout)
+    status, text = fetch(resolve_server_url(server), "/slots", params=params, timeout=timeout)
     return _slots_from(status, text, model)
 
 
@@ -285,7 +292,8 @@ async def aget_slots(
 ) -> "SlotsReport | tuple[int, str]":
     """Async version of get_slots()."""
     params = _slots_params(model, autoload)
+    timeout = _slots_timeout(autoload)
     if raw:
-        return await afetch(resolve_server_url(server), "/slots", params=params)
-    status, text = await afetch(resolve_server_url(server), "/slots", params=params)
+        return await afetch(resolve_server_url(server), "/slots", params=params, timeout=timeout)
+    status, text = await afetch(resolve_server_url(server), "/slots", params=params, timeout=timeout)
     return _slots_from(status, text, model)

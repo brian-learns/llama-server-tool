@@ -176,18 +176,6 @@ def test_props_cli_autoload_timeout(monkeypatch):
     assert fake.timeout.read == 300.0
 
 
-def test_props_cli_timeout_override(monkeypatch):
-    fake = FakeGet(response=json_response(SAMPLE_BODY))
-    run_props(monkeypatch, fake, "x", "--autoload", "--timeout", "60")
-    assert fake.timeout.read == 60.0
-
-
-def test_props_cli_timeout_without_autoload(monkeypatch):
-    fake = FakeGet(response=json_response(SAMPLE_BODY))
-    run_props(monkeypatch, fake, "--timeout", "60")
-    assert fake.timeout.read == 60.0
-
-
 def test_fetch_timeout_message(monkeypatch):
     def timed_out_get(url, timeout=None, params=None):
         raise httpx.ReadTimeout("timed out")

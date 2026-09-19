@@ -22,6 +22,8 @@ root:
   `prometheus_client`) → `get_metrics()`
 - `slots` — `GET /slots` (JSON array of slot objects) →
   `get_slots(model=..., autoload=...)`
+- `load` — `POST /models/load` (router mode; fire-and-launch, 300 s read
+  default, `--timeout`) → `load_model(model=..., timeout=...)`
 - `unload` — `POST /models/unload` (router mode; busy-slot pre-check with
   `autoload=false`, `--force` skips it) → `unload_model(model=..., force=...)`
 - `status` — composite board (server header from the URL port + `/proc`
@@ -29,8 +31,8 @@ root:
   `free`/`nvidia-smi` footer) → `get_status()`
 
 Every API function has an async twin (`aget_health()`, `aget_models()`,
-`aget_props()`, `aget_metrics()`, `aget_slots()`, `aunload_model()`) for
-asyncio consumers.
+`aget_props()`, `aget_metrics()`, `aget_slots()`, `aload_model()`,
+`aunload_model()`) for asyncio consumers.
 
 ## Development commands
 
@@ -107,8 +109,8 @@ in the wheel); this file covers *developing* it.
   they avoid vulture flagging an unused `cls` — but ruff N805 misfires on them
   in class scope, so keep the `# noqa: N805` with a short reason.
 - **Tests**: no live server is ever required — monkeypatch `httpx.get` (and
-  `httpx.post` for `unload`) with `FakeGet` from `tests/helpers.py` (records
-  URLs, query params, and the POST json body). CLI via
+  `httpx.post` for `load`/`unload`) with `FakeGet` from `tests/helpers.py`
+  (records URLs, query params, and the POST json body). CLI via
   `typer.testing.CliRunner` (assert `exit_code` and `output`/`stderr`); models
   and API functions directly; `pytest.raises` for expected `ServerError`s.
 
@@ -144,26 +146,34 @@ in the wheel); this file covers *developing* it.
 - `/props` on the dev build has extra fields the model deliberately ignores
   (`model_ftype`, `bos/eos_token`, `endpoint_*` booleans, `ui*`,
   `cors_proxy_enabled`) — candidates if props output is ever extended.
-- The dev build also has `POST /models/load` (`post_router_models_load`,
-  router mode: 400 "model is already running" if running, loads otherwise) —
-  a `load` command would pair with `unload` (phase 15 deferred it).
-
 ## Gotchas
 
-- `models --reload` (`GET /v1/models?reload=1`) is one of the two
-  **mutating** endpoints: the server re-scans its models dir, unloads
-  running models whose source was updated or removed, and never loads
-  anything. `unload` (`POST /models/unload`) is the other: router mode
-  only, synchronous (the instance is stopped before the response), and it
-  interrupts in-flight generation on the model's slots. Tests never call
-  either live (FakeGet records `params` / the POST json body); a live call
-  is a server-state change.
+- `models --reload`, `load`, and `unload` are the **mutating** operations.
+  `--reload` re-scans the models dir and unloads running models whose
+  source was updated or removed (never loads). `unload` (`POST
+  /models/unload`) is router-mode only, synchronous (the instance is
+  stopped before the response), and interrupts in-flight generation on the
+  model's slots. `load` (`POST /models/load`) is router-mode only and
+  **fire-and-launch**: the response returns when the instance is spawned
+  (state `loading`), not when ready — waiting is a separate holding call
+  (`slots/props MODEL --autoload`). `is_running` covers `loaded | loading
+  | sleeping`, so a mid-load or asleep model answers "model is already
+  running" (400); an unknown model is a **404** (the deployed dev binary
+  phrases it "File Not Found"). At `--models-max` capacity `load` evicts
+  the LRU running model first — on the dev router (`--models-max 3`) that
+  can be the session model. Tests never call any of these live (FakeGet
+  records `params` / the POST json body); a live call is a server-state
+  change.
 - Router proxy routes **auto-load a non-running model by default**
-  (`is_autoload` → server default): `slots MODEL` / `metrics MODEL` on an
-  unloaded model *loads it*. Calls that must stay side-effect-free send
-  `autoload=false` (`props` by default; `unload`'s busy check — that is
-  also why `get_slots` has an `autoload` param). `status` is safe: it only
-  slots-fetches models the registry reports as loaded.
+  (`is_autoload` → server default) — e.g. `metrics MODEL` on an unloaded
+  model *loads it*. The CLI is safe by default: `slots`/`props` always
+  send an explicit `autoload=false|true` (default false → 400 "model is
+  not loaded"), and `unload`'s busy check sends `autoload=false`. An
+  explicit `autoload=true` may hold until the load finishes, so
+  `get_slots`/`aget_slots` use a 300 s read for it (`_slots_timeout`).
+  API callers who *omit* `autoload` (`None`) still get the server default;
+  `status` is safe (it only slots-fetches models the registry reports as
+  loaded).
 - Router-mode POST routes (`/completion`, `/v1/chat/completions`, ...) take
   the model from the **JSON body's `"model"` field**, not a `?model=` query
   param (`proxy_post`); GET proxy routes use `?model=`.

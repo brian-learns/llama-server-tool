@@ -14,5 +14,5 @@ def test_bare_invocation_lists_commands():
     result = runner.invoke(app, [])
     assert result.exit_code == 0
     assert "Commands" in result.output
-    for name in ("health", "models", "props", "metrics", "slots", "unload", "status"):
+    for name in ("health", "models", "props", "metrics", "slots", "load", "unload", "status"):
         assert name in result.output

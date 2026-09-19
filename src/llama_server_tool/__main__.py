@@ -8,6 +8,7 @@ import json
 import typer
 
 from .health import check_health
+from .load import load_model
 from .metrics import get_metrics
 from .models import get_models
 from .props import get_props
@@ -176,8 +177,9 @@ def models(
 def props(
     model: str | None = typer.Argument(None, help="Model id to query; nothing is loaded by default."),
     server: str | None = typer.Option(None, help="Base URL of the llama-server."),
-    autoload: bool = typer.Option(False, help="Allow the server to load/pre-warm the model."),
-    timeout: float | None = typer.Option(None, help="Read timeout in seconds (default 5; 300 with --autoload)."),
+    autoload: bool = typer.Option(
+        False, help="Allow the server to load/pre-warm the model (the request holds until it is loaded; 300 s read)."
+    ),
     json: bool = typer.Option(
         False, help="Print the raw JSON response body instead of the report (includes chat_template)."
     ),
@@ -185,14 +187,14 @@ def props(
     """Show server properties via GET /props?model=<id> [MODEL]."""
     if json:
         try:
-            status, body = get_props(server, model=model, autoload=autoload, timeout=timeout, raw=True)
+            status, body = get_props(server, model=model, autoload=autoload, raw=True)
         except ServerError as err:
             typer.echo(f"props: {err}", err=True)
             raise typer.Exit(code=1) from err
         typer.echo(body)
         raise typer.Exit(code=0 if 200 <= status < 300 else 1)
     try:
-        result = get_props(server, model=model, autoload=autoload, timeout=timeout)
+        result = get_props(server, model=model, autoload=autoload)
     except ServerError as err:
         typer.echo(f"props: {err}", err=True)
         raise typer.Exit(code=1) from err
@@ -224,21 +226,45 @@ def metrics(
 def slots(
     model: str | None = typer.Argument(None, help="Model id to query (required in router mode)."),
     server: str | None = typer.Option(None, help="Base URL of the llama-server."),
+    autoload: bool = typer.Option(
+        False, help="Allow the server to load the model if it is not running (the request holds until it is loaded)."
+    ),
     json: bool = typer.Option(False, help="Print the raw JSON response body instead of the formatted report."),
 ) -> None:
     """Show slot state via GET /slots?model=<id> [MODEL]."""
     if json:
         try:
-            status, body = get_slots(server, model=model, raw=True)
+            status, body = get_slots(server, model=model, autoload=autoload, raw=True)
         except ServerError as err:
             typer.echo(f"slots: {err}", err=True)
             raise typer.Exit(code=1) from err
         typer.echo(body)
         raise typer.Exit(code=0 if 200 <= status < 300 else 1)
     try:
-        result = get_slots(server, model=model)
+        result = get_slots(server, model=model, autoload=autoload)
     except ServerError as err:
         typer.echo(f"slots: {err}", err=True)
+        raise typer.Exit(code=1) from err
+    typer.echo(result.render())
+    if result.error is not None:
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def load(
+    model: str = typer.Argument(..., help="Model id to load (exact match)."),
+    server: str | None = typer.Option(None, help="Base URL of the llama-server."),
+    timeout: float | None = typer.Option(None, help="Read timeout in seconds (default 300)."),
+) -> None:
+    """Load a model via POST /models/load (router mode).
+
+    Fire-and-launch: the response returns when the instance is spawned
+    (state loading) — wait for ready with `slots MODEL --autoload`. At
+    --models-max capacity the router evicts the LRU running model first."""
+    try:
+        result = load_model(model, server, timeout=timeout)
+    except ServerError as err:
+        typer.echo(f"load: {err}", err=True)
         raise typer.Exit(code=1) from err
     typer.echo(result.render())
     if result.error is not None:

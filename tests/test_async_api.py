@@ -16,12 +16,14 @@ from llama_server_tool import (
     aget_models,
     aget_props,
     aget_slots,
+    aload_model,
     aunload_model,
     check_health,
     get_metrics,
     get_models,
     get_props,
     get_slots,
+    load_model,
     unload_model,
 )
 from llama_server_tool.server import ServerError
@@ -181,6 +183,17 @@ def test_aunload_model_refuses_when_busy(monkeypatch):
     assert fake.calls == []  # refused before the POST
 
 
+def test_aload_model(monkeypatch):
+    fake = async_client(monkeypatch, response=json_response({"success": True}))
+    result = run(aload_model("m"))
+    assert result.success is True
+    assert result.model == "m"
+    assert fake.calls == [("http://127.0.0.0:8080/models/load", {"model": "m"})]
+    assert fake.client_timeout.read == 300.0  # long default: the server may block on an LRU unload
+    run(aload_model("m", timeout=60))
+    assert fake.client_timeout.read == 60.0
+
+
 def test_async_sync_parity(monkeypatch):
     """Given the same canned bodies, async and sync return equal models."""
     monkeypatch.setattr(httpx, "get", FakeGet(response=json_response({"status": "ok"})))
@@ -217,6 +230,12 @@ def test_async_sync_parity(monkeypatch):
     monkeypatch.setattr(unload_module, "aget_slots", fake_aget_slots)
     async_client(monkeypatch, response=json_response(not_running, status_code=400))
     assert run(aunload_model("m")) == unload_model("m")
+
+    # load: both paths get the 404 not-found body
+    not_found = {"error": {"code": 404, "message": "model is not found", "type": "not_found_error"}}
+    monkeypatch.setattr(httpx, "post", FakeGet(response=json_response(not_found, status_code=404)))
+    async_client(monkeypatch, response=json_response(not_found, status_code=404))
+    assert run(aload_model("m")) == load_model("m")
 
 
 def test_model_dump_json_for_tracing(monkeypatch):

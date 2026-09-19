@@ -66,9 +66,19 @@ def test_slots_model_param(monkeypatch):
     fake = FakeGet(response=json_response(SAMPLE_BODY))
     run_slots(monkeypatch, fake, "foo")
     assert fake.urls == ["http://127.0.0.0:8080/slots"]
-    assert fake.params == {"model": "foo"}
+    assert fake.params == {"model": "foo", "autoload": "false"}  # CLI default: side-effect-free
     run_slots(monkeypatch, fake)
-    assert fake.params is None
+    assert fake.params == {"autoload": "false"}
+
+
+def test_slots_cli_autoload_holds(monkeypatch):
+    """An explicit --autoload may hold the response until the model loads (300 s read)."""
+    fake = FakeGet(response=json_response(SAMPLE_BODY))
+    run_slots(monkeypatch, fake, "foo")
+    assert fake.timeout.read == 5.0
+    run_slots(monkeypatch, fake, "foo", "--autoload")
+    assert fake.params == {"model": "foo", "autoload": "true"}
+    assert fake.timeout.read == 300.0
 
 
 def test_slots_autoload_param(monkeypatch):
