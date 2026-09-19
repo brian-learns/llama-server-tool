@@ -29,6 +29,9 @@ filters are display-only, so `--json` cannot be combined with them. Note
 
 `models` prints one quoted id per line by default; `--show-modalities`
 and `--show-meta` (with `--meta-fields`) switch it to an aligned table.
+The `--input_modalities` / `--output_modalities` options have tab
+completion (install with `llama-server-tool --install-completion`) that
+suggests the modalities the registry actually declares.
 `models --reload` refreshes the registry from the server's models dir
 without a restart: loaded models whose source was updated or removed are
 unloaded, and nothing is loaded.

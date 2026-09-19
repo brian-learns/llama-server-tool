@@ -104,6 +104,15 @@ in the wheel); this file covers *developing* it.
 - **typer**: keep the explicit root `@app.callback(invoke_without_command=True)`
   — it prints the command list on bare invocation and prevents typer from
   collapsing a single command into the root.
+- **Shell completion**: use typer 0.27's `autocompletion=` on
+  `typer.Option` (click-style `shell_complete=` is deprecated in typer and
+  mistyped by `ty`). The callback is introspected: only params typed
+  `typer.Context` / `list[...]` / `str` (the incomplete word) are passed.
+  The completion script does **no** prefix filtering — filter by the
+  incomplete word in the callback. Trigger it manually:
+  `_LLAMA_SERVER_TOOL_COMPLETE=complete_bash COMP_WORDS="<prog> <words>
+  <incomplete>" COMP_CWORD=<n> llama-server-tool` (typer keeps the old
+  `instruction_shell` order, not click 8's `shell_instruction`).
 - **pydantic**: use `mode="before"` validators when normalization must happen
   *before* field constraints. Plain functions work as validators (pydantic v2);
   they avoid vulture flagging an unused `cls` — but ruff N805 misfires on them

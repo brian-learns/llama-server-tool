@@ -4,13 +4,14 @@
 """Tests for the models command (CLI) and the ModelList/ModelInfo models."""
 
 import json
+from types import SimpleNamespace
 
 import httpx
 import pytest
 from typer.testing import CliRunner
 
 from helpers import FakeGet, json_response
-from llama_server_tool.__main__ import app
+from llama_server_tool.__main__ import _complete_modalities, app
 from llama_server_tool.models import ModelInfo, ModelList, format_bytes, format_params
 
 runner = CliRunner()
@@ -441,3 +442,19 @@ def test_format_bytes():
     assert format_bytes(1500) == "1.50KB"
     assert format_bytes(512) == "512B"
     assert format_bytes(17548181504) == "17.55GB"
+
+
+def test_complete_modalities_union(monkeypatch):
+    monkeypatch.setattr(httpx, "get", FakeGet(response=json_response(SAMPLE_BODY)))
+    assert _complete_modalities(SimpleNamespace(params={}), "") == ["image", "text"]
+
+
+def test_complete_modalities_server_down(monkeypatch):
+    monkeypatch.setattr(httpx, "get", FakeGet(error=httpx.ConnectError("nope")))
+    assert _complete_modalities(SimpleNamespace(params={}), "") == ["audio", "image", "text", "video"]
+
+
+def test_complete_modalities_prefix(monkeypatch):
+    monkeypatch.setattr(httpx, "get", FakeGet(response=json_response(SAMPLE_BODY)))
+    assert _complete_modalities(SimpleNamespace(params={}), "im") == ["image"]
+    assert _complete_modalities(SimpleNamespace(params={}), "zz") == []

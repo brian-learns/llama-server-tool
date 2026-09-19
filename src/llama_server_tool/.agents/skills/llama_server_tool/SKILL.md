@@ -67,7 +67,9 @@ loaded. Filters: `--loaded`, `--input_modalities` /
 **all** requested). Table columns: `--show-modalities` (input/output),
 `--show-meta` (implies `--loaded`; default columns `n_params n_ctx_train
 n_embd n_vocab size vocab_type`), `--meta-fields f1,f2` (implies
-`--show-meta`; unknown field → error). The positional `MODEL` filters
+`--show-meta`; unknown field → error). The modality options have tab
+completion (install with `llama-server-tool --install-completion`) that
+suggests the modalities the registry declares. The positional `MODEL` filters
 client-side to the exact id (no match → exit 1). Empty filter results
 print nothing and exit 0. `--json` is mutually exclusive with the filters
 (but works with `--reload`).

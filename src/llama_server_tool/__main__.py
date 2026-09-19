@@ -67,6 +67,25 @@ def _filter_models_json(body: str, model: str) -> tuple[str, bool]:
     return json.dumps(parsed, indent=2), bool(parsed["data"])
 
 
+def _complete_modalities(ctx: typer.Context, incomplete: str) -> list[str]:
+    """Shell completion for the modality options: registry modalities matching the typed prefix.
+
+    Runs in typer's shell-complete mode (the completion script re-invokes the
+    CLI in a short-lived process); falls back to llama.cpp's known vocabulary
+    when the server is unreachable. The completion script does no prefix
+    filtering, so that happens here."""
+    try:
+        modalities: set[str] = set()
+        for entry in get_models(ctx.params.get("server")).data:
+            if entry.architecture is not None:
+                modalities.update(entry.architecture.input_modalities)
+                modalities.update(entry.architecture.output_modalities)
+        items = sorted(modalities)
+    except ServerError:
+        items = ["audio", "image", "text", "video"]
+    return [item for item in items if item.startswith(incomplete)]
+
+
 @app.command()
 def models(
     model: str | None = typer.Argument(None, help="Model id to show (exact match)."),
@@ -84,11 +103,13 @@ def models(
     input_modalities: list[str] | None = typer.Option(  # noqa: B008
         None,
         "--input_modalities",
+        autocompletion=_complete_modalities,
         help="Only show models accepting all of these input modalities (repeatable, comma-separated).",
     ),
     output_modalities: list[str] | None = typer.Option(  # noqa: B008
         None,
         "--output_modalities",
+        autocompletion=_complete_modalities,
         help="Only show models producing all of these output modalities (repeatable, comma-separated).",
     ),
     show_modalities: bool = typer.Option(False, help="Add input/output modality columns."),
