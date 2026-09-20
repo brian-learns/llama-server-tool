@@ -215,40 +215,46 @@ def test_status_block_render_parity():
     )
     expected = "\n".join(
         [
-            "=" * 65,
-            "Qwen3.8-27B (PID: 342265 | Port: 48249)",
-            " -> Unified System RAM (RSS): 21.71 GB",
-            " -> Virtual Memory Footprint: 139.87 GB",
-            " -> Dedicated Blackwell VRAM: 37.65 GB",
-            " -> Slot [0]: Status = IDLE | Context Ingested = 0 tokens | Active Gen Tokens = 0 | n_ctx = 262144",
-            " -> Slot [3]: Status = PROCESSING | Context Ingested = 165811 tokens | Active Gen Tokens = 0 | n_ctx = 262144",
-            "=" * 65,
+            "Qwen3.8-27B pid=342265 port=48249 rss=21.71GB virt=139.87GB vram=37.65GB",
+            "├─0 ␖ prompt=0 decoded=0 ctx=262144",
+            "└─3 ⛭ prompt=165811 decoded=0 ctx=262144",
         ]
     )
     assert block.render() == expected
 
 
 def test_status_block_render_variants():
-    assert StatusBlock(model="m").render().splitlines()[1] == "m"
-    assert "Qwen3.8-27B (Port: 48249)" in StatusBlock(model="Qwen3.8-27B", port=48249).render()
-    assert "VRAM" not in StatusBlock(model="m", rss_gb=1.0, vsz_gb=2.0).render()
+    # absent fields are omitted from the process line
+    assert StatusBlock(model="m").render() == "m"
+    assert StatusBlock(model="Qwen3.8-27B", port=48249).render() == "Qwen3.8-27B port=48249"
+    assert "vram" not in StatusBlock(model="m", rss_gb=1.0, vsz_gb=2.0).render()
     # dict-form next_token (some builds) still yields its n_decoded
     slot = Slot(id=1, is_processing=True, n_ctx=8, next_token=SlotNextToken(n_decoded=5))
-    assert "Active Gen Tokens = 5" in StatusBlock(model="m", slots=[slot]).render()
-    assert "Error: boom" in StatusBlock(model="m", slots_error="boom").render()
+    assert "decoded=5" in StatusBlock(model="m", slots=[slot]).render()
+    assert "└─ ! boom" in StatusBlock(model="m", slots_error="boom").render()
 
 
 def test_status_report_render():
     server = StatusBlock(model="llama-server", port=8080)
     block = StatusBlock(model="m", port=1)
     assert StatusReport(server=server, blocks=[block], system="FOOTER").render() == (
-        server.render() + "\n\n" + block.render() + "\n\nFOOTER"
+        server.render() + "\n" + block.render() + "\n\nFOOTER"
     )
-    assert StatusReport(server=server).render() == server.render() + "\n\nstatus: no loaded models"
+    assert StatusReport(server=server).render() == server.render() + "\nstatus: no loaded models"
     assert StatusReport().render() == "status: no loaded models"
     assert (
         StatusReport(error=ModelList.model_validate({"error": {"code": 503, "message": "Loading model", "type": "unavailable_error"}}).error).render()
         == "status: Loading model"
+    )
+
+
+def test_status_render_two_blocks():
+    """Each block owns its slot tree; the branch glyphs reset per block."""
+    a = StatusBlock(model="A", slots=[Slot(id=0), Slot(id=1)])
+    b = StatusBlock(model="B", slots=[Slot(id=0), Slot(id=1)])
+    idle = "␖ prompt=0 decoded=0 ctx=0"
+    assert StatusReport(blocks=[a, b]).render() == (
+        f"A\n├─0 {idle}\n└─1 {idle}\nB\n├─0 {idle}\n└─1 {idle}"
     )
 
 
@@ -314,10 +320,10 @@ def test_status_cli(monkeypatch):
     fake_status_env(monkeypatch)
     result = runner.invoke(app, ["status"])
     assert result.exit_code == 0
-    assert "llama-server (Port: 8080)" in result.output
-    assert result.output.index("llama-server (Port: 8080)") < result.output.index("Qwen3.8-27B (Port: 48249)")
-    assert "Qwen3.8-27B (Port: 48249)" in result.output
-    assert "Slot [3]: Status = PROCESSING | Context Ingested = 4433 tokens" in result.output
+    assert "llama-server port=8080" in result.output
+    assert result.output.index("llama-server port=8080") < result.output.index("Qwen3.8-27B port=48249")
+    assert "Qwen3.8-27B port=48249" in result.output
+    assert "└─3 ⛭ prompt=4433 decoded=0 ctx=262144" in result.output
     assert "MEM FOOTER" in result.output
 
 

@@ -5,11 +5,11 @@
 Composite `status` board: per-loaded-model memory and slot state, plus a
 host-level system footer.
 
-Ports the layout of the slots.sh maintenance script: a `llama-server`
-header block (the router process itself, port from the server URL) followed
-by one block per loaded model (header with PID/port, RSS/VSZ/VRAM, one line
-per slot) and `free` + `nvidia-smi` output. Intended for `watch -n 1
-llama-server-tool status`.
+Compact rewrite of the slots.sh maintenance script layout: one line per
+process (the `llama-server` router itself, port from the server URL, then
+each loaded model: pid/port, rss/virt/vram) with a slot tree below each
+(`⛭` processing, `␖` idle; prompt/decoded/ctx), and `free` + `nvidia-smi`
+output at the bottom. Intended for `watch -n 1 llama-server-tool status`.
 
 The registry (`/v1/models`) lists every loadable model; only entries with
 `status.value == "loaded"` have a subprocess and are shown. The subprocess
@@ -27,8 +27,6 @@ from pydantic import BaseModel
 from .models import get_models
 from .server import ApiError, ServerError, resolve_server_url
 from .slots import Slot, SlotNextToken, get_slots
-
-RULE = "=" * 65
 
 
 def find_pids_by_ports(ports: set[int], proc_root: str = "/proc") -> dict[int, int]:
@@ -129,8 +127,8 @@ class StatusBlock(BaseModel):
 
     @staticmethod
     def _slot_line(slot: Slot) -> str:
-        """Format the slot line, matching the slots.sh layout."""
-        status = "PROCESSING" if slot.is_processing else "IDLE"
+        """Format the compact slot values: state glyph plus prompt/decoded/ctx (0 when absent)."""
+        state = "⛭" if slot.is_processing else "␖"
         prompt = slot.n_prompt_tokens or 0
         token = slot.next_token
         if isinstance(token, list):
@@ -141,30 +139,27 @@ class StatusBlock(BaseModel):
         else:
             decoded = 0
         ctx = slot.n_ctx or 0
-        return f"Status = {status} | Context Ingested = {prompt} tokens | Active Gen Tokens = {decoded} | n_ctx = {ctx}"
+        return f"{state} prompt={prompt} decoded={decoded} ctx={ctx}"
 
     def render(self) -> str:
-        """Format the model block for output."""
-        header = self.model
-        meta = []
+        """Format the process line and its slot tree for output."""
+        line = self.model
         if self.pid is not None:
-            meta.append(f"PID: {self.pid}")
+            line += f" pid={self.pid}"
         if self.port is not None:
-            meta.append(f"Port: {self.port}")
-        if meta:
-            header += f" ({' | '.join(meta)})"
-        lines = [RULE, header]
+            line += f" port={self.port}"
         if self.rss_gb is not None:
-            lines.append(f" -> Unified System RAM (RSS): {self.rss_gb:.2f} GB")
+            line += f" rss={self.rss_gb:.2f}GB"
         if self.vsz_gb is not None:
-            lines.append(f" -> Virtual Memory Footprint: {self.vsz_gb:.2f} GB")
+            line += f" virt={self.vsz_gb:.2f}GB"
         if self.vram_gb is not None:
-            lines.append(f" -> Dedicated Blackwell VRAM: {self.vram_gb:.2f} GB")
+            line += f" vram={self.vram_gb:.2f}GB"
+        lines = [line]
         if self.slots_error is not None:
-            lines.append(f" -> Error: {self.slots_error}")
-        for slot in self.slots:
-            lines.append(f" -> Slot [{slot.id}]: {self._slot_line(slot)}")
-        lines.append(RULE)
+            lines.append(f"└─ ! {self.slots_error}")
+        for i, slot in enumerate(self.slots):
+            branch = "└─" if i == len(self.slots) - 1 else "├─"
+            lines.append(f"{branch}{slot.id} {self._slot_line(slot)}")
         return "\n".join(lines)
 
 
@@ -177,7 +172,7 @@ class StatusReport(BaseModel):
     system: str | None = None
 
     def render(self) -> str:
-        """Format the board for output."""
+        """Format the board for output: the process lines are contiguous, the footer is set off."""
         if self.error is not None:
             return f"status: {self.error.message}"
         parts = []
@@ -187,7 +182,7 @@ class StatusReport(BaseModel):
             parts.extend(block.render() for block in self.blocks)
         else:
             parts.append("status: no loaded models")
-        body = "\n\n".join(parts)
+        body = "\n".join(parts)
         if self.system:
             body += f"\n\n{self.system}"
         return body

@@ -198,30 +198,19 @@ unload: MiniCPM5-2B is busy (1 slot(s) processing); use --force to unload anyway
 
 ### status — board of loaded models
 
-Opens with the router process itself (`llama-server` header; port from the
-server URL, PID via a `/proc` cmdline scan — works across accounts), then
-per loaded model: PID/port (port from the registry's `status.args`),
-RSS/VSZ/VRAM, and one line per slot. Ends with a `free -h` + `nvidia-smi`
-footer (`--no-system` omits it). Made for `watch -n 1 llama-server-tool
-status`.
+One line per process — the router itself (`llama-server`; port from the
+server URL, PID via a `/proc` cmdline scan, works across accounts) and
+each loaded model (pid/port, rss/virt/vram) — with a slot tree below each
+(`⛭` processing, `␖` idle; prompt/decoded/ctx tokens). Ends with a
+`free -h` + `nvidia-smi` footer (`--no-system` omits it). Made for
+`watch -n 1 llama-server-tool status`.
 
 ```
 $ llama-server-tool status
-=================================================================
-llama-server (PID: 404576 | Port: 9931)
- -> Unified System RAM (RSS): 0.39 GB
- -> Virtual Memory Footprint: 15.36 GB
- -> Dedicated Blackwell VRAM: 0.17 GB
-=================================================================
-
-=================================================================
-Qwen3.8-27B (PID: 342265 | Port: 48249)
- -> Unified System RAM (RSS): 21.71 GB
- -> Virtual Memory Footprint: 139.87 GB
- -> Dedicated Blackwell VRAM: 37.65 GB
- -> Slot [0]: Status = IDLE | Context Ingested = 0 tokens | Active Gen Tokens = 0 | n_ctx = 262144
- -> Slot [3]: Status = PROCESSING | Context Ingested = 4433 tokens | Active Gen Tokens = 0 | n_ctx = 262144
-=================================================================
+llama-server pid=237423 port=9931 rss=0.39GB virt=15.36GB vram=0.17GB
+Qwen3.8-27B pid=237918 port=36039 rss=21.71GB virt=139.87GB vram=37.65GB
+├─0 ␖ prompt=0 decoded=0 ctx=262144
+└─3 ⛭ prompt=4433 decoded=0 ctx=262144
 ```
 
 Only `loaded` models appear (the registry lists every loadable one; use
